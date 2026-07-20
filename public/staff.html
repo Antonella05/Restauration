@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Le Bon Plat — Espace Staff</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <!-- CONNEXION STAFF -->
+  <div id="loginScreen" class="auth-wrap">
+    <div class="auth-card card">
+      <div class="logo-lg">🔐</div>
+      <h1>Espace Staff</h1>
+      <p class="muted">Call center · Gérant · Administrateur · Développeur</p>
+      <form id="staffLoginForm" class="mt">
+        <div class="field">
+          <label for="username">Identifiant</label>
+          <input id="username" type="text" autocomplete="username" required />
+        </div>
+        <div class="field">
+          <label for="password">Mot de passe</label>
+          <input id="password" type="password" autocomplete="current-password" required />
+        </div>
+        <button class="btn block" type="submit">Se connecter</button>
+      </form>
+      <div class="demo-box">
+        <strong>Comptes de démonstration :</strong><br/>
+        Call center — <code>callcenter</code> / <code>call123</code><br/>
+        Gérant — <code>gerant</code> / <code>gerant123</code><br/>
+        Administrateur — <code>admin</code> / <code>admin123</code><br/>
+        Développeur — <code>dev</code> / <code>dev123</code>
+      </div>
+      <p class="muted mt" style="font-size:.82rem"><a href="/">← Retour à l'espace client</a></p>
+    </div>
+  </div>
+
+  <!-- TABLEAU DE BORD STAFF -->
+  <div id="app" class="hidden">
+    <header class="topbar">
+      <div class="container">
+        <div class="brand"><span class="logo">🍽️</span> Le Bon Plat <span style="opacity:.7;font-weight:500">· Staff</span></div>
+        <div class="spacer"></div>
+        <nav id="staffNav"></nav>
+        <span class="user-chip">
+          <span class="rt-indicator"><span class="rt-dot" id="rtDot"></span></span>
+          <span id="roleLabel"></span>
+        </span>
+        <nav><button id="logoutBtn">Déconnexion</button></nav>
+      </div>
+    </header>
+
+    <main class="container" style="padding-bottom:40px">
+      <!-- VUE COMMANDES -->
+      <section id="viewOrders" class="hidden">
+        <div class="between flex" style="margin:22px 0 10px">
+          <h2 class="section-title" style="margin:0">Commandes</h2>
+          <div class="flex">
+            <select id="statusFilter" class="field" style="margin:0;min-width:180px">
+              <option value="">Tous les statuts</option>
+              <option value="pending">En attente</option>
+              <option value="accepted">Acceptées</option>
+              <option value="preparing">En préparation</option>
+              <option value="delivering">En livraison</option>
+              <option value="delivered">Livrées</option>
+              <option value="cancelled">Annulées</option>
+            </select>
+            <button class="btn secondary small" id="refreshOrders">↻</button>
+          </div>
+        </div>
+        <div id="statBar" class="stat-row"></div>
+        <div id="ordersContainer"></div>
+      </section>
+
+      <!-- VUE TABLEAU DE BORD -->
+      <section id="viewDash" class="hidden">
+        <h2 class="section-title">Tableau de bord</h2>
+        <div id="dashStats" class="stat-row"></div>
+        <div class="card" style="padding:18px">
+          <h3 style="margin-top:0">Aperçu du jour</h3>
+          <div id="dashDetail"></div>
+        </div>
+      </section>
+
+      <!-- VUE CATALOGUE (développeur / admin) -->
+      <section id="viewCatalog" class="hidden">
+        <div class="between flex" style="margin:22px 0 10px">
+          <h2 class="section-title" style="margin:0">Gestion du catalogue</h2>
+          <button class="btn small" id="newProductBtn">+ Nouveau produit</button>
+        </div>
+        <div class="card" style="padding:16px;margin-bottom:18px">
+          <h3 style="margin-top:0">Catégories</h3>
+          <div id="catManage" class="flex" style="flex-wrap:wrap"></div>
+          <div class="flex mt">
+            <input id="newCatName" class="field" style="margin:0" placeholder="Nouvelle catégorie" />
+            <button class="btn secondary small" id="addCatBtn">Ajouter</button>
+          </div>
+        </div>
+        <div class="table-wrap card">
+          <table class="data">
+            <thead><tr><th>Produit</th><th>Catégorie</th><th>Prix</th><th>Dispo.</th><th></th></tr></thead>
+            <tbody id="productRows"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- MODALE PRODUIT -->
+  <div id="drawerOverlay" class="drawer-overlay"></div>
+  <aside id="drawer" class="drawer">
+    <header><h2 id="drawerTitle">Produit</h2><button class="close-x" id="drawerClose">&times;</button></header>
+    <div class="content" id="drawerContent"></div>
+    <footer id="drawerFooter"></footer>
+  </aside>
+
+  <div id="toasts"></div>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/staff.js"></script>
+</body>
+</html>

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Le Bon Plat — Commander en ligne</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <!-- ÉCRAN DE CONNEXION CLIENT -->
+  <div id="loginScreen" class="auth-wrap hidden">
+    <div class="auth-card card">
+      <div class="logo-lg">🍽️</div>
+      <h1>Le Bon Plat</h1>
+      <p class="muted">Commandez vos plats préférés en quelques clics.</p>
+      <form id="clientLoginForm" class="mt">
+        <div class="field">
+          <label for="cName">Votre nom</label>
+          <input id="cName" type="text" placeholder="Ex. Awa Diallo" required />
+        </div>
+        <div class="field">
+          <label for="cPhone">Téléphone</label>
+          <input id="cPhone" type="tel" placeholder="Ex. 90 00 00 00" required />
+        </div>
+        <button class="btn block" type="submit">Continuer</button>
+      </form>
+      <p class="muted mt" style="font-size:.82rem">
+        Espace personnel (call center, gérant, admin, développeur) :
+        <a href="/staff.html">connexion staff →</a>
+      </p>
+    </div>
+  </div>
+
+  <!-- APPLICATION CLIENT -->
+  <div id="app" class="hidden">
+    <header class="topbar">
+      <div class="container">
+        <div class="brand"><span class="logo">🍽️</span> Le Bon Plat</div>
+        <div class="spacer"></div>
+        <nav>
+          <button data-view="menu" class="active">Menu</button>
+          <button data-view="orders">Mes commandes <span id="ordersDot"></span></button>
+        </nav>
+        <span class="user-chip">
+          <span class="rt-indicator"><span class="rt-dot" id="rtDot"></span></span>
+          👤 <span id="userName"></span>
+        </span>
+        <nav><button id="logoutBtn">Quitter</button></nav>
+      </div>
+    </header>
+
+    <main class="container">
+      <!-- VUE MENU -->
+      <section id="viewMenu">
+        <div class="hero">
+          <h1>Bienvenue chez Le Bon Plat</h1>
+          <p>Petit déjeuner, pizzas, grillades, glaces… Découvrez notre carte et commandez en direct.
+             Suivez votre commande en temps réel jusqu'à la livraison.</p>
+          <button class="btn secondary" onclick="document.getElementById('menuAnchor').scrollIntoView({behavior:'smooth'})">Voir le menu</button>
+        </div>
+
+        <div id="menuAnchor"></div>
+        <h2 class="section-title">Notre menu</h2>
+        <div id="catTabs" class="cat-tabs"></div>
+        <div id="products" class="grid"></div>
+      </section>
+
+      <!-- VUE MES COMMANDES -->
+      <section id="viewOrders" class="hidden">
+        <h2 class="section-title">Mes commandes</h2>
+        <div id="ordersList"></div>
+      </section>
+    </main>
+
+    <!-- BOUTON PANIER -->
+    <button id="cartFab" class="cart-fab">🛒 Panier <span id="cartCount" class="cart-badge">0</span></button>
+  </div>
+
+  <!-- TIROIR PANIER / COMMANDE -->
+  <div id="drawerOverlay" class="drawer-overlay"></div>
+  <aside id="drawer" class="drawer">
+    <header>
+      <h2 id="drawerTitle">Votre panier</h2>
+      <button class="close-x" id="drawerClose">&times;</button>
+    </header>
+    <div class="content" id="drawerContent"></div>
+    <footer id="drawerFooter"></footer>
+  </aside>
+
+  <div id="toasts"></div>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/client.js"></script>
+</body>
+</html>
