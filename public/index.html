@@ -3,78 +3,193 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Le Bon Plat — Commander en ligne</title>
+  <title>Le Bon Plat — Commandez, suivez, savourez</title>
+  <meta name="description" content="Le Bon Plat : commandez vos plats préférés en ligne et suivez votre commande en temps réel jusqu'à la livraison." />
   <link rel="stylesheet" href="/css/styles.css" />
 </head>
 <body>
-  <!-- ÉCRAN DE CONNEXION CLIENT -->
-  <div id="loginScreen" class="auth-wrap hidden">
-    <div class="auth-card card">
-      <div class="logo-lg">🍽️</div>
-      <h1>Le Bon Plat</h1>
-      <p class="muted">Commandez vos plats préférés en quelques clics.</p>
-      <form id="clientLoginForm" class="mt">
-        <div class="field">
-          <label for="cName">Votre nom</label>
-          <input id="cName" type="text" placeholder="Ex. Awa Diallo" required />
-        </div>
-        <div class="field">
-          <label for="cPhone">Téléphone</label>
-          <input id="cPhone" type="tel" placeholder="Ex. 90 00 00 00" required />
-        </div>
-        <button class="btn block" type="submit">Continuer</button>
-      </form>
-      <p class="muted mt" style="font-size:.82rem">
-        Espace personnel (call center, gérant, admin, développeur) :
-        <a href="/staff.html">connexion staff →</a>
-      </p>
-    </div>
-  </div>
-
-  <!-- APPLICATION CLIENT -->
-  <div id="app" class="hidden">
-    <header class="topbar">
-      <div class="container">
-        <div class="brand"><span class="logo">🍽️</span> Le Bon Plat</div>
-        <div class="spacer"></div>
-        <nav>
-          <button data-view="menu" class="active">Menu</button>
-          <button data-view="orders">Mes commandes <span id="ordersDot"></span></button>
+  <div id="app">
+    <!-- ===== NAVBAR ===== -->
+    <header class="navbar" id="navbar">
+      <div class="container nav-inner">
+        <a class="brand" href="#top"><span class="logo">🍽️</span> Le Bon Plat</a>
+        <nav class="nav-links" id="navLinks">
+          <a href="#menu" data-nav>Menu</a>
+          <a href="#how" data-nav>Comment ça marche</a>
+          <a href="#avis" data-nav>Avis</a>
+          <button id="navOrders" class="link-btn hidden" data-view="orders">Mes commandes <span id="ordersDot"></span></button>
         </nav>
-        <span class="user-chip">
-          <span class="rt-indicator"><span class="rt-dot" id="rtDot"></span></span>
-          👤 <span id="userName"></span>
-        </span>
-        <nav><button id="logoutBtn">Quitter</button></nav>
+        <div class="nav-right">
+          <span class="rt-indicator" id="rtWrap" title="Connexion temps réel">
+            <span class="rt-dot" id="rtDot"></span>
+          </span>
+          <span class="user-chip hidden" id="userChip">👤 <span id="userName"></span></span>
+          <button class="btn small ghost-light hidden" id="logoutBtn">Quitter</button>
+          <button class="btn small" id="loginBtn">Se connecter</button>
+          <a class="staff-link" href="/staff.html" title="Espace staff">Staff</a>
+        </div>
       </div>
     </header>
 
-    <main class="container">
-      <!-- VUE MENU -->
-      <section id="viewMenu">
-        <div class="hero">
-          <h1>Bienvenue chez Le Bon Plat</h1>
-          <p>Petit déjeuner, pizzas, grillades, glaces… Découvrez notre carte et commandez en direct.
-             Suivez votre commande en temps réel jusqu'à la livraison.</p>
-          <button class="btn secondary" onclick="document.getElementById('menuAnchor').scrollIntoView({behavior:'smooth'})">Voir le menu</button>
-        </div>
+    <span id="top"></span>
 
-        <div id="menuAnchor"></div>
-        <h2 class="section-title">Notre menu</h2>
+    <!-- ===== VUE ACCUEIL (landing + menu) ===== -->
+    <div id="viewHome">
+      <!-- HERO -->
+      <section class="hero">
+        <div class="container hero-grid">
+          <div class="hero-copy">
+            <span class="hero-eyebrow">🔥 Cuisine fraîche · Livraison rapide</span>
+            <h1>Vos plats préférés,<br/>livrés en un clic.</h1>
+            <p>Petit déjeuner, pizzas, grillades, glaces… Commandez en ligne et
+               <strong>suivez votre commande en temps réel</strong>, de la préparation à votre porte.</p>
+            <div class="hero-actions">
+              <button class="btn lg" data-scroll="#menu">Voir le menu</button>
+              <button class="btn lg ghost" data-scroll="#how">Comment ça marche</button>
+            </div>
+            <div class="hero-badges">
+              <div class="hb"><b>2 min</b><span>pour commander</span></div>
+              <div class="hb"><b>Temps réel</b><span>suivi de livraison</span></div>
+              <div class="hb"><b>Cash / Mobile</b><span>paiement au choix</span></div>
+            </div>
+          </div>
+          <div class="hero-art" aria-hidden="true">
+            <div class="plate">
+              <span class="food f1">🍕</span>
+              <span class="food f2">🍔</span>
+              <span class="food f3">🍗</span>
+              <span class="food f4">🍨</span>
+              <span class="food f5">🥗</span>
+            </div>
+          </div>
+        </div>
+        <div class="hero-wave"></div>
+      </section>
+
+      <!-- VALEURS -->
+      <section class="container values">
+        <div class="value-card">
+          <div class="vc-icon">🌿</div>
+          <h3>Frais chaque jour</h3>
+          <p>Des produits sélectionnés et préparés à la commande.</p>
+        </div>
+        <div class="value-card">
+          <div class="vc-icon">⚡</div>
+          <h3>Rapide</h3>
+          <p>Commande en 2 minutes, préparation lancée aussitôt.</p>
+        </div>
+        <div class="value-card">
+          <div class="vc-icon">📍</div>
+          <h3>Suivi en direct</h3>
+          <p>Visualisez chaque étape jusqu'à la livraison.</p>
+        </div>
+      </section>
+
+      <!-- CATÉGORIES -->
+      <section class="container">
+        <div class="section-head">
+          <h2 class="section-title">Explorez nos catégories</h2>
+          <p class="muted">Un large choix pour tous les moments de la journée.</p>
+        </div>
+        <div id="catCards" class="cat-cards"></div>
+      </section>
+
+      <!-- PLATS EN VEDETTE -->
+      <section class="container">
+        <div class="section-head">
+          <h2 class="section-title">Nos incontournables</h2>
+          <p class="muted">Les plats préférés de nos clients.</p>
+        </div>
+        <div id="featured" class="grid"></div>
+      </section>
+
+      <!-- COMMENT ÇA MARCHE -->
+      <section id="how" class="how-section">
+        <div class="container">
+          <div class="section-head center">
+            <h2 class="section-title">Comment ça marche ?</h2>
+            <p class="muted">Commander n'a jamais été aussi simple.</p>
+          </div>
+          <div class="steps">
+            <div class="step"><div class="step-n">1</div><div class="step-ic">🍔</div><h3>Choisissez</h3><p>Parcourez le menu et ajoutez vos plats au panier.</p></div>
+            <div class="step"><div class="step-n">2</div><div class="step-ic">📝</div><h3>Commandez</h3><p>Renseignez votre nom et contact, validez en un clic.</p></div>
+            <div class="step"><div class="step-n">3</div><div class="step-ic">👨‍🍳</div><h3>On prépare</h3><p>Notre équipe reçoit et prépare votre commande.</p></div>
+            <div class="step"><div class="step-n">4</div><div class="step-ic">🛵</div><h3>Suivez & recevez</h3><p>Suivez la livraison en temps réel jusqu'à vous.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MENU COMPLET -->
+      <section id="menu" class="container">
+        <div class="section-head">
+          <h2 class="section-title">Notre menu</h2>
+          <p class="muted">Tout est chargé en direct depuis notre cuisine.</p>
+        </div>
         <div id="catTabs" class="cat-tabs"></div>
         <div id="products" class="grid"></div>
       </section>
 
-      <!-- VUE MES COMMANDES -->
-      <section id="viewOrders" class="hidden">
-        <h2 class="section-title">Mes commandes</h2>
-        <div id="ordersList"></div>
+      <!-- AVIS -->
+      <section id="avis" class="avis-section">
+        <div class="container">
+          <div class="section-head center">
+            <h2 class="section-title">Ils nous font confiance</h2>
+          </div>
+          <div class="testimonials">
+            <div class="testimonial"><div class="stars">★★★★★</div><p>« Commande passée en 2 minutes et suivi jusqu'à la livraison. Bluffant ! »</p><div class="who">— Awa D.</div></div>
+            <div class="testimonial"><div class="stars">★★★★★</div><p>« Les pizzas sont excellentes et toujours chaudes à l'arrivée. »</p><div class="who">— Kevin M.</div></div>
+            <div class="testimonial"><div class="stars">★★★★★</div><p>« Enfin un resto où je vois où en est ma commande en direct. »</p><div class="who">— Fatou S.</div></div>
+          </div>
+        </div>
       </section>
-    </main>
 
-    <!-- BOUTON PANIER -->
-    <button id="cartFab" class="cart-fab">🛒 Panier <span id="cartCount" class="cart-badge">0</span></button>
+      <!-- CTA FINAL -->
+      <section class="cta-band">
+        <div class="container cta-inner">
+          <div>
+            <h2>Un petit creux ? On s'occupe du reste.</h2>
+            <p>Parcourez le menu et commandez en quelques secondes.</p>
+          </div>
+          <button class="btn lg secondary" data-scroll="#menu">Commander maintenant</button>
+        </div>
+      </section>
+
+      <!-- FOOTER -->
+      <footer class="site-footer">
+        <div class="container footer-grid">
+          <div>
+            <div class="brand"><span class="logo">🍽️</span> Le Bon Plat</div>
+            <p class="muted">La cuisine que vous aimez, livrée avec le sourire.</p>
+          </div>
+          <div>
+            <h4>Horaires</h4>
+            <p class="muted">Lun – Dim : 08h00 – 23h00</p>
+          </div>
+          <div>
+            <h4>Contact</h4>
+            <p class="muted">📞 90 00 00 00<br/>📍 Cotonou, Bénin</p>
+          </div>
+          <div>
+            <h4>Espace pro</h4>
+            <p><a href="/staff.html">Connexion staff →</a></p>
+          </div>
+        </div>
+        <div class="footer-bottom">© 2026 Le Bon Plat — MVP. Tous droits réservés.</div>
+      </footer>
+    </div>
+
+    <!-- ===== VUE MES COMMANDES ===== -->
+    <div id="viewOrders" class="container hidden">
+      <div class="section-head" style="margin-top:30px">
+        <h2 class="section-title">Mes commandes</h2>
+        <button class="btn secondary small" data-view="home">← Retour à l'accueil</button>
+      </div>
+      <div id="ordersList"></div>
+    </div>
   </div>
+
+  <!-- BOUTON PANIER -->
+  <button id="cartFab" class="cart-fab">🛒 Panier <span id="cartCount" class="cart-badge">0</span></button>
 
   <!-- TIROIR PANIER / COMMANDE -->
   <div id="drawerOverlay" class="drawer-overlay"></div>
@@ -86,6 +201,28 @@
     <div class="content" id="drawerContent"></div>
     <footer id="drawerFooter"></footer>
   </aside>
+
+  <!-- MODALE CONNEXION CLIENT -->
+  <div id="loginOverlay" class="modal-overlay">
+    <div class="modal card">
+      <button class="close-x modal-close" id="loginClose">&times;</button>
+      <div class="logo-lg">🍽️</div>
+      <h2 id="loginTitle">Bienvenue !</h2>
+      <p class="muted" id="loginSub">Entrez votre nom et votre numéro pour commander et suivre votre commande en temps réel.</p>
+      <form id="clientLoginForm" class="mt">
+        <div class="field">
+          <label for="cName">Votre nom</label>
+          <input id="cName" type="text" placeholder="Ex. Awa Diallo" required />
+        </div>
+        <div class="field">
+          <label for="cPhone">Téléphone</label>
+          <input id="cPhone" type="tel" placeholder="Ex. 90 00 00 00" required />
+        </div>
+        <button class="btn block" type="submit">Continuer</button>
+      </form>
+      <p class="muted mt" style="font-size:.8rem">Pas de mot de passe requis — simple et rapide.</p>
+    </div>
+  </div>
 
   <div id="toasts"></div>
 
