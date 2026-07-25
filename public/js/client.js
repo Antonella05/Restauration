@@ -123,17 +123,12 @@
     } catch (err) { toast('Impossible de charger le menu', 'error'); }
   }
 
-  const CAT_EMOJI = {
-    'Petit déjeuner': '☕', 'Entrées': '🥗', 'Pizza': '🍕',
-    'Sandwich': '🥪', 'Viandes': '🍗', 'Glaces': '🍨',
-  };
-
   function renderCatCards() {
     $('#catCards').innerHTML = menu.map((c) => `
       <button class="cat-card" data-gocat="${c.id}">
-        <span class="cc-emoji">${CAT_EMOJI[c.name] || '🍽️'}</span>
         <span class="cc-name">${escapeHtml(c.name)}</span>
         <span class="cc-count">${c.products.length} plat${c.products.length > 1 ? 's' : ''}</span>
+        <span class="cc-go">Voir la sélection →</span>
       </button>`).join('');
     $$('#catCards [data-gocat]').forEach((b) => b.addEventListener('click', () => {
       activeCat = parseInt(b.dataset.gocat, 10);
@@ -154,20 +149,22 @@
   function productCard(p) {
     const inCart = cart.find((c) => c.product.id === p.id);
     return `
-      <div class="card product">
-        <div class="product-img"><img src="${escapeHtml(p.image_url || '')}" alt="${escapeHtml(p.name)}" /></div>
+      <div class="product">
         <div class="body">
-          <h3>${escapeHtml(p.name)}</h3>
-          <div class="desc">${escapeHtml(p.description || '')}</div>
-          <div class="foot">
+          <div class="p-head">
+            <h3>${escapeHtml(p.name)}</h3>
+            <span class="leader"></span>
             <span class="price">${fmtMoney(p.price)}</span>
+          </div>
+          ${p.description ? `<div class="desc">${escapeHtml(p.description)}</div>` : ''}
+          <div class="actions">
             ${inCart
               ? `<div class="qty">
                    <button data-dec="${p.id}">−</button>
                    <span>${inCart.qty}</span>
                    <button data-inc="${p.id}">+</button>
                  </div>`
-              : `<button class="btn small" data-add="${p.id}">Ajouter</button>`}
+              : `<button class="add-btn" data-add="${p.id}">+ Ajouter</button>`}
           </div>
         </div>
       </div>`;
@@ -184,7 +181,7 @@
 
   function renderCatTabs() {
     $('#catTabs').innerHTML = menu.map((c) =>
-      `<button class="${c.id === activeCat ? 'active' : ''}" data-cat="${c.id}">${CAT_EMOJI[c.name] || ''} ${escapeHtml(c.name)}</button>`
+      `<button class="${c.id === activeCat ? 'active' : ''}" data-cat="${c.id}">${escapeHtml(c.name)}</button>`
     ).join('');
     $$('#catTabs button').forEach((b) =>
       b.addEventListener('click', () => { activeCat = parseInt(b.dataset.cat, 10); renderCatTabs(); renderProducts(); }));

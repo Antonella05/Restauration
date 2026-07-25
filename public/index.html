@@ -5,7 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Le Bon Plat — Commandez, suivez, savourez</title>
   <meta name="description" content="Le Bon Plat : commandez vos plats préférés en ligne et suivez votre commande en temps réel jusqu'à la livraison." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/styles.css" />
+  <style>
+    /* Si les webfonts se chargent, on les préfère à la pile système. */
+    :root { --serif: "Fraunces", Georgia, "Times New Roman", serif; --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  </style>
 </head>
 <body>
   <div id="app">
@@ -39,13 +46,13 @@
       <section class="hero">
         <div class="container hero-grid">
           <div class="hero-copy">
-            <span class="hero-eyebrow">🔥 Cuisine fraîche · Livraison rapide</span>
-            <h1>Vos plats préférés,<br/>livrés en un clic.</h1>
-            <p>Petit déjeuner, pizzas, grillades, glaces… Commandez en ligne et
-               <strong>suivez votre commande en temps réel</strong>, de la préparation à votre porte.</p>
+            <span class="hero-eyebrow">Restaurant · Commande en ligne</span>
+            <h1>La cuisine que vous aimez,<br/><em>servie à votre table</em> ou chez vous.</h1>
+            <p>Une carte fraîche préparée à la commande, et le suivi de votre livraison
+               en temps réel — de la cuisine jusqu'à votre porte.</p>
             <div class="hero-actions">
-              <button class="btn lg" data-scroll="#menu">Voir le menu</button>
-              <button class="btn lg ghost" data-scroll="#how">Comment ça marche</button>
+              <button class="btn lg" data-scroll="#menu">Découvrir la carte</button>
+              <button class="btn lg ghost" data-scroll="#how">Comment commander</button>
             </div>
             <div class="hero-badges">
               <div class="hb"><b>2 min</b><span>pour commander</span></div>
@@ -54,32 +61,33 @@
             </div>
           </div>
           <div class="hero-art" aria-hidden="true">
-            <div class="plate">
-              <span class="food f1">🍕</span>
-              <span class="food f2">🍔</span>
-              <span class="food f3">🍗</span>
-              <span class="food f4">🍨</span>
-              <span class="food f5">🥗</span>
+            <div class="menu-card">
+              <div class="mc-kicker">La Maison</div>
+              <div class="mc-title">Le Bon Plat</div>
+              <div class="mc-line"><span class="n">Poulet braisé</span><span class="d"></span><span class="p">3 500</span></div>
+              <div class="mc-line"><span class="n">Pizza Reine</span><span class="d"></span><span class="p">5 000</span></div>
+              <div class="mc-line"><span class="n">Poisson braisé</span><span class="d"></span><span class="p">4 000</span></div>
+              <div class="mc-line"><span class="n">Coupe de fruits</span><span class="d"></span><span class="p">1 800</span></div>
+              <div class="mc-foot">Prix en FCFA · service continu</div>
             </div>
           </div>
         </div>
-        <div class="hero-wave"></div>
       </section>
 
       <!-- VALEURS -->
       <section class="container values">
         <div class="value-card">
-          <div class="vc-icon">🌿</div>
+          <div class="vc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4-2-7-5-7-10a7 7 0 0 1 14 0c0 5-3 8-7 10Z"/><path d="M12 11c0-3 2-5 2-5"/></svg></div>
           <h3>Frais chaque jour</h3>
           <p>Des produits sélectionnés et préparés à la commande.</p>
         </div>
         <div class="value-card">
-          <div class="vc-icon">⚡</div>
-          <h3>Rapide</h3>
+          <div class="vc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg></div>
+          <h3>Préparation rapide</h3>
           <p>Commande en 2 minutes, préparation lancée aussitôt.</p>
         </div>
         <div class="value-card">
-          <div class="vc-icon">📍</div>
+          <div class="vc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.2 7-11a7 7 0 0 0-14 0c0 4.8 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg></div>
           <h3>Suivi en direct</h3>
           <p>Visualisez chaque étape jusqu'à la livraison.</p>
         </div>
@@ -88,8 +96,9 @@
       <!-- CATÉGORIES -->
       <section class="container">
         <div class="section-head">
-          <h2 class="section-title">Explorez nos catégories</h2>
-          <p class="muted">Un large choix pour tous les moments de la journée.</p>
+          <span class="eyebrow">La carte</span>
+          <h2 class="section-title">Nos catégories</h2>
+          <p class="muted">Du petit déjeuner au dessert, pour chaque moment de la journée.</p>
         </div>
         <div id="catCards" class="cat-cards"></div>
       </section>
@@ -97,8 +106,8 @@
       <!-- PLATS EN VEDETTE -->
       <section class="container">
         <div class="section-head">
+          <span class="eyebrow">Sélection du chef</span>
           <h2 class="section-title">Nos incontournables</h2>
-          <p class="muted">Les plats préférés de nos clients.</p>
         </div>
         <div id="featured" class="grid"></div>
       </section>
@@ -107,14 +116,14 @@
       <section id="how" class="how-section">
         <div class="container">
           <div class="section-head center">
-            <h2 class="section-title">Comment ça marche ?</h2>
-            <p class="muted">Commander n'a jamais été aussi simple.</p>
+            <span class="eyebrow">La marche à suivre</span>
+            <h2 class="section-title">Commander, simplement</h2>
           </div>
           <div class="steps">
-            <div class="step"><div class="step-n">1</div><div class="step-ic">🍔</div><h3>Choisissez</h3><p>Parcourez le menu et ajoutez vos plats au panier.</p></div>
-            <div class="step"><div class="step-n">2</div><div class="step-ic">📝</div><h3>Commandez</h3><p>Renseignez votre nom et contact, validez en un clic.</p></div>
-            <div class="step"><div class="step-n">3</div><div class="step-ic">👨‍🍳</div><h3>On prépare</h3><p>Notre équipe reçoit et prépare votre commande.</p></div>
-            <div class="step"><div class="step-n">4</div><div class="step-ic">🛵</div><h3>Suivez & recevez</h3><p>Suivez la livraison en temps réel jusqu'à vous.</p></div>
+            <div class="step"><div class="step-n">01</div><h3>Choisissez</h3><p>Parcourez la carte et composez votre commande.</p></div>
+            <div class="step"><div class="step-n">02</div><h3>Commandez</h3><p>Indiquez votre nom et votre contact, puis validez.</p></div>
+            <div class="step"><div class="step-n">03</div><h3>On prépare</h3><p>La cuisine reçoit et prépare votre commande aussitôt.</p></div>
+            <div class="step"><div class="step-n">04</div><h3>Suivez & recevez</h3><p>Suivez chaque étape en temps réel jusqu'à vous.</p></div>
           </div>
         </div>
       </section>
@@ -122,17 +131,18 @@
       <!-- MENU COMPLET -->
       <section id="menu" class="container">
         <div class="section-head">
-          <h2 class="section-title">Notre menu</h2>
-          <p class="muted">Tout est chargé en direct depuis notre cuisine.</p>
+          <span class="eyebrow">Notre carte</span>
+          <h2 class="section-title">Le menu</h2>
         </div>
         <div id="catTabs" class="cat-tabs"></div>
         <div id="products" class="grid"></div>
       </section>
 
       <!-- AVIS -->
-      <section id="avis" class="avis-section">
-        <div class="container">
+      <section id="avis" class="container avis-section" style="margin-top:72px">
+        <div>
           <div class="section-head center">
+            <span class="eyebrow">Avis clients</span>
             <h2 class="section-title">Ils nous font confiance</h2>
           </div>
           <div class="testimonials">
@@ -167,7 +177,7 @@
           </div>
           <div>
             <h4>Contact</h4>
-            <p class="muted">📞 90 00 00 00<br/>📍 Cotonou, Bénin</p>
+            <p class="muted">Tél. 90 00 00 00<br/>Cotonou, Bénin</p>
           </div>
           <div>
             <h4>Espace pro</h4>
