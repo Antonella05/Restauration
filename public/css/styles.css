@@ -128,13 +128,24 @@ h1, h2, h3, h4 { font-family: var(--serif); font-weight: 600; line-height: 1.15;
    HERO
    ============================================================ */
 .hero {
-  position: relative; color: #f4ece0;
+  --hero-photo: url("https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1600&q=60");
+  position: relative; overflow: hidden; color: #f4ece0;
   background:
     radial-gradient(900px 420px at 78% 15%, rgba(163,137,79,.20), transparent 70%),
     linear-gradient(180deg, #2a1d13 0%, #31241a 100%);
   border-bottom: 3px solid var(--gold);
 }
-.hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 40px; align-items: center; padding: 88px 24px 96px; }
+/* Photo d'ambiance en fond, très atténuée : reste lisible même si l'image manque. */
+.hero::before {
+  content: ""; position: absolute; inset: 0; z-index: 0;
+  background-image: var(--hero-photo); background-size: cover; background-position: center;
+  opacity: .22; mix-blend-mode: luminosity;
+}
+.hero::after {
+  content: ""; position: absolute; inset: 0; z-index: 0;
+  background: linear-gradient(90deg, rgba(35,25,15,.85) 0%, rgba(35,25,15,.55) 50%, rgba(35,25,15,.35) 100%);
+}
+.hero-grid { position: relative; z-index: 1; display: grid; grid-template-columns: 1.05fr .95fr; gap: 40px; align-items: center; padding: 88px 24px 96px; }
 .hero-copy .hero-eyebrow { color: #d8bd86; }
 .hero-copy h1 {
   color: #fbf5ea; font-size: 3.2rem; line-height: 1.06; margin: 16px 0 20px; letter-spacing: -.015em;
@@ -208,9 +219,15 @@ h1, h2, h3, h4 { font-family: var(--serif); font-weight: 600; line-height: 1.15;
 
 .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 48px; }
 .product {
-  display: flex; align-items: baseline; gap: 12px; padding: 20px 0; border-bottom: 1px solid var(--line);
+  display: flex; align-items: flex-start; gap: 16px; padding: 20px 0; border-bottom: 1px solid var(--line);
   background: none; border-radius: 0;
 }
+.product .thumb {
+  flex: 0 0 auto; width: 88px; height: 88px; border-radius: 8px; overflow: hidden;
+  background: #efe8dc; border: 1px solid var(--line);
+}
+.product .thumb img { width: 100%; height: 100%; object-fit: cover; }
+.product.no-img .thumb { display: none; }
 .product .body { flex: 1; display: flex; flex-direction: column; gap: 4px; padding: 0; }
 .product .p-head { display: flex; align-items: baseline; gap: 10px; }
 .product h3 { font-size: 1.16rem; margin: 0; font-weight: 600; }

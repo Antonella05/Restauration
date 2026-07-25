@@ -148,8 +148,16 @@
 
   function productCard(p) {
     const inCart = cart.find((c) => c.product.id === p.id);
+    // On n'affiche que des vraies photos (http/https). Si l'image casse au
+    // chargement, on retombe proprement sur la mise en page sans photo.
+    const hasImg = p.image_url && /^https?:/i.test(p.image_url);
+    const thumb = hasImg
+      ? `<div class="thumb"><img src="${escapeHtml(p.image_url)}" alt="${escapeHtml(p.name)}" loading="lazy"
+           onerror="this.closest('.product').classList.add('no-img')" /></div>`
+      : '';
     return `
-      <div class="product">
+      <div class="product${hasImg ? '' : ' no-img'}">
+        ${thumb}
         <div class="body">
           <div class="p-head">
             <h3>${escapeHtml(p.name)}</h3>

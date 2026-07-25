@@ -63,14 +63,18 @@ const MENU = [
   },
 ];
 
-// Images d'illustration (SVG data-URI par catégorie) — placeholders légers, sans réseau.
-function placeholder(label, color) {
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='400' height='260'><rect width='400' height='260' fill='${color}'/><text x='50%' y='50%' fill='white' font-family='sans-serif' font-size='26' text-anchor='middle' dominant-baseline='middle'>${label}</text></svg>`;
-  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
-}
-const CAT_COLORS = {
-  'Petit déjeuner': '#e67e22', 'Entrées': '#27ae60', 'Pizza': '#c0392b',
-  'Sandwich': '#8e44ad', 'Viandes': '#a04000', 'Glaces': '#2980b9',
+// Photos par catégorie (Unsplash). Chargées à l'exécution dans le navigateur.
+// Le champ image_url de chaque produit est modifiable depuis l'écran
+// « Développeur → Catalogue » : pour changer une photo, il suffit d'y coller
+// une autre URL, sans toucher au code.
+const U = (id) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=600&q=60`;
+const CAT_IMAGE = {
+  'Petit déjeuner': U('1525351484163-7529414344d8'),
+  'Entrées':        U('1512621776951-a57141f2eefd'),
+  'Pizza':          U('1513104890138-7c749659a591'),
+  'Sandwich':       U('1528735602780-2552fd46c7af'),
+  'Viandes':        U('1544025162-d76694265947'),
+  'Glaces':         U('1501443762994-82bd5dab7a72'),
 };
 
 function ensureSeed() {
@@ -94,9 +98,9 @@ function ensureSeed() {
     );
     MENU.forEach((cat, idx) => {
       const info = insCat.run(cat.category, idx);
-      const color = CAT_COLORS[cat.category] || '#555';
+      const image = CAT_IMAGE[cat.category] || null;
       for (const p of cat.products) {
-        insProd.run(info.lastInsertRowid, p.name, p.description, p.price, placeholder(p.name, color));
+        insProd.run(info.lastInsertRowid, p.name, p.description, p.price, image);
       }
     });
   }
