@@ -12,10 +12,11 @@ const authRoutes = require('./routes/auth');
 const menuRoutes = require('./routes/menu');
 const { router: orderRoutes } = require('./routes/orders');
 const productRoutes = require('./routes/products');
+const settingsRoutes = require('./routes/settings');
 const realtime = require('./realtime');
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '2mb' })); // logo importé en data URL
 app.use(cookieParser());
 
 // API
@@ -23,6 +24,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/menu', menuRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/products', productRoutes);
+app.use('/api/settings', settingsRoutes);
 
 app.get('/api/health', (req, res) => res.json({ ok: true, ts: Date.now() }));
 

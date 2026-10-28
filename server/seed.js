@@ -14,6 +14,17 @@ const STAFF = [
   { role: 'developer',  name: 'Développeur',               username: 'dev',        password: 'dev123' },
 ];
 
+// Boissons : utiles pour le scénario de remplacement (ex. Coca-Cola indisponible → Panta).
+const DRINKS = {
+  category: 'Boissons',
+  products: [
+    { name: 'Coca-Cola 33 cl',      price: 600,  description: 'Canette bien fraîche.' },
+    { name: 'Panta 33 cl',          price: 500,  description: "Boisson gazeuse à l'orange." },
+    { name: 'Eau minérale 50 cl',   price: 300,  description: 'Eau plate.' },
+    { name: 'Jus de bissap',        price: 700,  description: 'Bissap maison, servi frais.' },
+  ],
+};
+
 const MENU = [
   {
     category: 'Petit déjeuner',
@@ -61,6 +72,7 @@ const MENU = [
       { name: 'Coupe fruits',         price: 1800, description: 'Glace et fruits frais de saison.' },
     ],
   },
+  DRINKS,
 ];
 
 // Photos par catégorie (Unsplash). Chargées à l'exécution dans le navigateur.
@@ -75,7 +87,13 @@ const CAT_IMAGE = {
   'Sandwich':       U('1528735602780-2552fd46c7af'),
   'Viandes':        U('1544025162-d76694265947'),
   'Glaces':         U('1501443762994-82bd5dab7a72'),
+  'Boissons':       U('1622483767028-3f66f32aef97'),
 };
+
+const insCatStmt = () => db.prepare('INSERT INTO categories (name, sort_order) VALUES (?, ?)');
+const insProdStmt = () => db.prepare(
+  'INSERT INTO products (category_id, name, description, price, image_url, available) VALUES (?, ?, ?, ?, ?, 1)'
+);
 
 function ensureSeed() {
   // Staff
@@ -92,10 +110,8 @@ function ensureSeed() {
   // Menu
   const catCount = db.prepare('SELECT COUNT(*) AS c FROM categories').get().c;
   if (catCount === 0) {
-    const insCat = db.prepare('INSERT INTO categories (name, sort_order) VALUES (?, ?)');
-    const insProd = db.prepare(
-      'INSERT INTO products (category_id, name, description, price, image_url, available) VALUES (?, ?, ?, ?, ?, 1)'
-    );
+    const insCat = insCatStmt();
+    const insProd = insProdStmt();
     MENU.forEach((cat, idx) => {
       const info = insCat.run(cat.category, idx);
       const image = CAT_IMAGE[cat.category] || null;
@@ -103,6 +119,23 @@ function ensureSeed() {
         insProd.run(info.lastInsertRowid, p.name, p.description, p.price, image);
       }
     });
+    db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('seed_drinks', '1')").run();
+  }
+
+  // Bases créées avant l'ajout des boissons : on les ajoute une seule fois
+  // (un drapeau évite de les recréer si le restaurant les supprime ensuite).
+  const drinksSeeded = db.prepare("SELECT value FROM settings WHERE key = 'seed_drinks'").get();
+  if (!drinksSeeded) {
+    const hasCat = db.prepare('SELECT id FROM categories WHERE name = ?').get(DRINKS.category);
+    if (!hasCat) {
+      const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order), 0) AS m FROM categories').get().m;
+      const info = insCatStmt().run(DRINKS.category, maxOrder + 1);
+      const insProd = insProdStmt();
+      for (const p of DRINKS.products) {
+        insProd.run(info.lastInsertRowid, p.name, p.description, p.price, CAT_IMAGE[DRINKS.category]);
+      }
+    }
+    db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('seed_drinks', '1')").run();
   }
 }
 

@@ -68,15 +68,17 @@ Le **client** se connecte simplement avec un nom et un numéro de téléphone.
 ```
 server/
   index.js          Serveur Express + service statique + init WebSocket
-  db.js             Connexion SQLite + schéma
+  db.js             Connexion SQLite + schéma (+ migrations douces des bases existantes)
+  settings.js       Paramètres du restaurant (identité, accueil, règles de retrait)
   seed.js           Données de démonstration (comptes staff + menu) — idempotent
   auth.js           JWT, rôles et middlewares d'autorisation
   realtime.js       Hub WebSocket (diffusion des événements de commande)
   routes/
     auth.js         Connexion client (nom+tél) et staff (login+mdp)
     menu.js         Menu public (catégories + produits disponibles)
-    orders.js       Création, liste, détail, changement de statut des commandes
+    orders.js       Commandes : création, statuts, modification par le call center, statistiques
     products.js     Gestion du catalogue (développeur / admin)
+    settings.js     Lecture publique / mise à jour (admin, développeur) de la personnalisation
 public/
   index.html        Application client
   staff.html        Application staff (login + tableaux de bord par rôle)
@@ -88,7 +90,10 @@ public/
 
 ### Statuts de commande
 
-`En attente` → `Acceptée` → `En préparation` → `En livraison` → `Livrée` (ou `Annulée`).
+- **Livraison** : `En attente` → `Acceptée` → `En préparation` → `En livraison` → `Livrée`
+- **Retrait sur place** : `En attente` → `Acceptée` → `En préparation` → `Prête à retirer` → `Retirée`
+  (ou `Non récupérée` si le client ne vient pas)
+- À tout moment avant la clôture : `Annulée`.
 
 - Le **call center** peut *accepter* ou *annuler* une commande en attente.
 - Le **gérant / admin** fait *avancer* la commande jusqu'à la livraison, ou l'annule.
@@ -109,3 +114,27 @@ public/
 | `PORT` | `3000` | Port d'écoute |
 | `JWT_SECRET` | valeur de dev | Secret de signature des tokens (à définir en production) |
 | `DB_PATH` | `data/restaurant.db` | Emplacement de la base SQLite |
+
+## Évolutions suite à la démonstration du 3 septembre 2026
+
+| Chantier | Où | Fonctionnement |
+|---|---|---|
+| Personnalisation (logo, nom, accueil) | Staff → **Personnalisation** (admin, développeur) | Nom, slogan, logo (import d'image ou URL), couleur principale, textes et photo de l'accueil, téléphone, adresse, horaires. Les plats affichés dans « Nos incontournables » se choisissent dans le **Catalogue** (case « Mettre en avant »). |
+| Livraison ou retrait sur place | Tunnel de commande client | Choix du mode ; activation de chaque mode dans la personnalisation. |
+| Adresse + géolocalisation | Tunnel de commande client | Adresse libre (quartier, repères) et/ou bouton « Utiliser ma position actuelle ». Le staff voit l'adresse et un lien « Voir sur la carte ». La géolocalisation exige **https** (ou localhost). |
+| Commandes récurrentes | Profil client | Nom, téléphone, adresse, position et mode préféré sont mémorisés (case « Mémoriser ») et pré-remplis à la commande suivante. |
+| Commandes à retirer | Client + gérant | Retrait « dès que possible » ou à une heure précise (commande à l'avance). Le client est prévenu quand la commande est **prête**, avec les consignes et le délai de conservation. Le gérant clôture en « Retirée » ou « Non récupérée » ; un badge signale le dépassement du délai. |
+| Alertes nouvelles commandes | Staff (call center, gérant, admin) | Carillon sonore **répété toutes les 20 s** tant que la commande n'est pas prise en charge, bandeau rouge clignotant, carte surlignée, titre d'onglet clignotant, notification du navigateur (si autorisée). À la connexion, les commandes arrivées en votre absence déclenchent l'alerte. Bouton « Son activé / coupé ». |
+| Modification d'une commande | Staff → bouton « Modifier la commande » | Remplacer un produit (ex. Coca-Cola → Panta), ajouter, retirer, changer les quantités. Le produit de remplacement est facturé à son prix ; le total est recalculé côté serveur. L'**accord du client** doit être coché. Historique conservé. |
+| Information du client | Espace client « Mes commandes » | Notification temps réel + bandeau « Votre commande a été modifiée » (détail, ancien/nouveau total) avec bouton « J'ai pris connaissance ». Le staff voit si le client a lu la modification. |
+| Statistiques quotidiennes | Staff → **Tableau de bord** (gérant, admin) | Pour une date choisie : commandes livrées, retirées sur place, non récupérées, annulées, recettes, commandes reçues par mode, top produits, et historique des 7 derniers jours. |
+
+**Points restant à valider avec chaque restaurant** (paramétrables, non figés dans le code) :
+délai de conservation et règle en cas de commande non récupérée (champs de la personnalisation),
+étapes exactes du retrait, et comportement des alertes quand aucun membre du staff n'est connecté
+(aujourd'hui : l'alerte se déclenche à la prochaine connexion ; une alerte hors ligne type SMS
+nécessiterait un service externe).
+
+> Note navigateur : le son ne peut être joué qu'après une première interaction avec la page
+> (règle des navigateurs). Après une connexion, c'est automatique ; après un simple rechargement,
+> un bandeau invite à cliquer une fois sur la page.

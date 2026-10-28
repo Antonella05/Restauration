@@ -7,6 +7,20 @@ const { signToken, authRequired, ROLE_LABELS } = require('../auth');
 
 const router = express.Router();
 
+/** Profil client renvoyé au navigateur : sert à pré-remplir les commandes suivantes. */
+function clientProfile(user) {
+  return {
+    id: user.id,
+    role: user.role,
+    name: user.name,
+    phone: user.phone,
+    address: user.address || '',
+    latitude: user.latitude,
+    longitude: user.longitude,
+    fulfillment: user.fulfillment || null,
+  };
+}
+
 /**
  * Connexion CLIENT — version simplifiée MVP (nom + téléphone, sans mot de passe),
  * conforme au cahier des charges. Crée le compte client s'il n'existe pas.
@@ -35,7 +49,7 @@ router.post('/client-login', (req, res) => {
   const token = signToken(user);
   res.json({
     token,
-    user: { id: user.id, role: user.role, name: user.name, phone: user.phone },
+    user: clientProfile(user),
   });
 });
 
@@ -69,6 +83,11 @@ router.post('/login', (req, res) => {
 
 /** Renvoie l'utilisateur courant à partir du token. */
 router.get('/me', authRequired, (req, res) => {
+  if (req.user.role === 'client') {
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+    if (!user) return res.status(401).json({ error: 'Compte introuvable.' });
+    return res.json({ user: clientProfile(user) });
+  }
   res.json({
     user: {
       id: req.user.id,

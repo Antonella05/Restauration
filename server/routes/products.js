@@ -39,6 +39,7 @@ router.post('/', manage, (req, res) => {
   const description = (req.body.description || '').trim();
   const imageUrl = (req.body.image_url || '').trim();
   const available = req.body.available === false || req.body.available === 0 ? 0 : 1;
+  const featured = req.body.featured ? 1 : 0;
 
   if (!categoryId || !name) {
     return res.status(400).json({ error: 'Catégorie et nom requis.' });
@@ -47,9 +48,9 @@ router.post('/', manage, (req, res) => {
   if (!cat) return res.status(400).json({ error: 'Catégorie introuvable.' });
 
   const info = db.prepare(`
-    INSERT INTO products (category_id, name, description, price, image_url, available)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(categoryId, name, description || null, price, imageUrl || null, available);
+    INSERT INTO products (category_id, name, description, price, image_url, available, featured)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(categoryId, name, description || null, price, imageUrl || null, available, featured);
 
   res.status(201).json({ product: db.prepare('SELECT * FROM products WHERE id = ?').get(info.lastInsertRowid) });
 });
@@ -66,11 +67,12 @@ router.put('/:id', manage, (req, res) => {
   const description = req.body.description != null ? String(req.body.description).trim() : existing.description;
   const imageUrl = req.body.image_url != null ? String(req.body.image_url).trim() : existing.image_url;
   const available = req.body.available != null ? (req.body.available ? 1 : 0) : existing.available;
+  const featured = req.body.featured != null ? (req.body.featured ? 1 : 0) : existing.featured;
 
   db.prepare(`
-    UPDATE products SET category_id = ?, name = ?, description = ?, price = ?, image_url = ?, available = ?
+    UPDATE products SET category_id = ?, name = ?, description = ?, price = ?, image_url = ?, available = ?, featured = ?
     WHERE id = ?
-  `).run(categoryId, name, description || null, price, imageUrl || null, available, id);
+  `).run(categoryId, name, description || null, price, imageUrl || null, available, featured, id);
 
   res.json({ product: db.prepare('SELECT * FROM products WHERE id = ?').get(id) });
 });
