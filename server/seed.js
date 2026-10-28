@@ -75,19 +75,41 @@ const MENU = [
   DRINKS,
 ];
 
-// Photos par catégorie (Unsplash). Chargées à l'exécution dans le navigateur.
+// Photos provisoires libres de droits (Unsplash), en attendant les photos du restaurant.
 // Le champ image_url de chaque produit est modifiable depuis l'écran
 // « Développeur → Catalogue » : pour changer une photo, il suffit d'y coller
 // une autre URL, sans toucher au code.
-const U = (id) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=600&q=60`;
+const U = (id) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=800&q=70`;
 const CAT_IMAGE = {
   'Petit déjeuner': U('1525351484163-7529414344d8'),
   'Entrées':        U('1512621776951-a57141f2eefd'),
   'Pizza':          U('1513104890138-7c749659a591'),
   'Sandwich':       U('1528735602780-2552fd46c7af'),
-  'Viandes':        U('1544025162-d76694265947'),
-  'Glaces':         U('1501443762994-82bd5dab7a72'),
-  'Boissons':       U('1622483767028-3f66f32aef97'),
+  'Viandes':        U('1555939594-58d7cb561ad1'),
+  'Glaces':         U('1488900128323-21503983a07e'),
+  'Boissons':       U('1595981267035-7b04ca84a82d'),
+};
+const PRODUCT_IMAGE = {
+  'Bouillie de mil':    U('1571748982800-fa51082c2224'),
+  'Omelette complète':  U('1510693206972-df098062cb71'),
+  'Café + Croissant':   U('1555507036-ab1f4038808a'),
+  'Salade César':       U('1550304943-4f24f54ddde9'),
+  'Avocat crevettes':   U('1565680018434-b513d5e5fd47'),
+  'Pizza Margherita':   U('1574071318508-1cdbab80d002'),
+  'Pizza Reine':        U('1513104890138-7c749659a591'),
+  'Pizza 4 fromages':   U('1593560708920-61dd98c46a4e'),
+  'Sandwich poulet':    U('1528735602780-2552fd46c7af'),
+  'Shawarma bœuf':      U('1529006557810-274b9b2fc783'),
+  'Poulet braisé':      U('1532550907401-a500c9a57435'),
+  'Brochettes de bœuf': U('1555939594-58d7cb561ad1'),
+  'Poisson braisé':     U('1519708227418-c8fd9a32b7a2'),
+  'Glace vanille':      U('1497034825429-c343d7c6a68f'),
+  'Glace chocolat':     U('1563805042-7684c019e1cb'),
+  'Coupe fruits':       U('1490474418585-ba9bad8fd0ea'),
+  'Coca-Cola 33 cl':    U('1554866585-cd94860890b7'),
+  'Panta 33 cl':        U('1600271886742-f049cd451bba'),
+  'Eau minérale 50 cl': U('1548839140-29a749e1cf4d'),
+  'Jus de bissap':      U('1595981267035-7b04ca84a82d'),
 };
 
 const insCatStmt = () => db.prepare('INSERT INTO categories (name, sort_order) VALUES (?, ?)');
@@ -116,7 +138,7 @@ function ensureSeed() {
       const info = insCat.run(cat.category, idx);
       const image = CAT_IMAGE[cat.category] || null;
       for (const p of cat.products) {
-        insProd.run(info.lastInsertRowid, p.name, p.description, p.price, image);
+        insProd.run(info.lastInsertRowid, p.name, p.description, p.price, PRODUCT_IMAGE[p.name] || image);
       }
     });
     db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('seed_drinks', '1')").run();
@@ -132,7 +154,7 @@ function ensureSeed() {
       const info = insCatStmt().run(DRINKS.category, maxOrder + 1);
       const insProd = insProdStmt();
       for (const p of DRINKS.products) {
-        insProd.run(info.lastInsertRowid, p.name, p.description, p.price, CAT_IMAGE[DRINKS.category]);
+        insProd.run(info.lastInsertRowid, p.name, p.description, p.price, PRODUCT_IMAGE[p.name] || CAT_IMAGE[DRINKS.category]);
       }
     }
     db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('seed_drinks', '1')").run();

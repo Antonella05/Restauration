@@ -1,7 +1,7 @@
 /* Interface CLIENT : landing, menu, panier, commande, suivi temps réel. */
 (function () {
   const {
-    Auth, api, toast, connectRealtime, Brand, isSafeImage, fmtMoney, fmtDate, fmtTime, mapUrl, badge, escapeHtml,
+    Auth, api, toast, connectRealtime, Brand, isSafeImage, productPhoto, categoryPhoto, fmtMoney, fmtDate, fmtTime, mapUrl, badge, escapeHtml,
     STATUS_LABELS, FINAL_STATUSES, FLOWS, FULFILLMENT_LABELS,
   } = App;
 
@@ -164,6 +164,7 @@
     try {
       const { categories } = await api('/menu');
       menu = categories.filter((c) => c.products.length);
+      menu.forEach((c) => c.products.forEach((p) => { p.category_name = c.name; }));
       if (!activeCat && menu.length) activeCat = menu[0].id;
       renderCatCards();
       renderFeatured();
@@ -174,11 +175,15 @@
   }
 
   function renderCatCards() {
-    $('#catCards').innerHTML = menu.map((c) => `
+    $('#catCards').innerHTML = menu.map((c, i) => `
       <button class="cat-card" data-gocat="${c.id}">
-        <span class="cc-name">${escapeHtml(c.name)}</span>
-        <span class="cc-count">${c.products.length} plat${c.products.length > 1 ? 's' : ''}</span>
-        <span class="cc-go">Voir la sélection →</span>
+        <img class="cc-photo" src="${escapeHtml(categoryPhoto(c.name, 500))}" alt="" loading="lazy" onerror="this.remove()" />
+        <span class="cc-num">${String(i + 1).padStart(2, '0')}</span>
+        <span class="cc-text">
+          <span class="cc-name">${escapeHtml(c.name)}</span>
+          <span class="cc-count">${c.products.length} plat${c.products.length > 1 ? 's' : ''}</span>
+        </span>
+        <span class="cc-go" aria-hidden="true">→</span>
       </button>`).join('');
     $$('#catCards [data-gocat]').forEach((b) => b.addEventListener('click', () => {
       activeCat = parseInt(b.dataset.gocat, 10);
@@ -190,14 +195,14 @@
   /** Plats mis en avant par le restaurant (catalogue) ; à défaut, un plat par catégorie. */
   function featuredProducts() {
     const chosen = menu.flatMap((c) => c.products.filter((p) => p.featured));
-    if (chosen.length) return chosen.slice(0, 8);
+    if (chosen.length) return chosen.slice(0, 5);
     const picks = [];
     for (const c of menu) { if (c.products[0]) picks.push(c.products[0]); }
-    return picks.slice(0, 4);
+    return picks.slice(0, 5);
   }
 
   function renderFeatured() {
-    $('#featured').innerHTML = featuredProducts().map(productCard).join('');
+    $('#featured').innerHTML = featuredProducts().map((p) => productCard(p, 'feature')).join('');
     bindProductButtons('#featured');
   }
 
@@ -208,36 +213,36 @@
       <div class="mc-line"><span class="n">${escapeHtml(p.name)}</span><span class="d"></span><span class="p">${(p.price || 0).toLocaleString('fr-FR')}</span></div>`).join('');
   }
 
-  function productCard(p) {
+  /** Carte produit : ligne de menu (par défaut) ou grande carte « incontournable » (variant = 'feature'). */
+  function productCard(p, variant) {
     const inCart = cart.find((c) => c.product.id === p.id);
-    // On n'affiche que des vraies photos (http/https). Si l'image casse au
-    // chargement, on retombe proprement sur la mise en page sans photo.
-    const hasImg = p.image_url && /^https?:/i.test(p.image_url);
-    const thumb = hasImg
-      ? `<div class="thumb"><img src="${escapeHtml(p.image_url)}" alt="${escapeHtml(p.name)}" loading="lazy"
-           onerror="this.closest('.product').classList.add('no-img')" /></div>`
-      : '';
+    const feature = variant === 'feature';
+    // Photo du restaurant si elle existe, sinon photo d'illustration ; si elle
+    // casse au chargement, on retombe proprement sur la mise en page sans photo.
+    const img = productPhoto(p, p.category_name, feature ? 900 : 360);
     return `
-      <div class="product${hasImg ? '' : ' no-img'}">
-        ${thumb}
+      <article class="product${feature ? ' product--feature' : ''}">
+        <div class="thumb"><img src="${escapeHtml(img)}" alt="${escapeHtml(p.name)}" loading="lazy"
+           onerror="this.closest('.product').classList.add('no-img')" /></div>
         <div class="body">
+          ${feature && p.category_name ? `<span class="p-cat">${escapeHtml(p.category_name)}</span>` : ''}
           <div class="p-head">
             <h3>${escapeHtml(p.name)}</h3>
             <span class="leader"></span>
-            <span class="price">${fmtMoney(p.price)}</span>
+            <span class="price">${(p.price || 0).toLocaleString('fr-FR')}<small>FCFA</small></span>
           </div>
           ${p.description ? `<div class="desc">${escapeHtml(p.description)}</div>` : ''}
           <div class="actions">
             ${inCart
               ? `<div class="qty">
-                   <button data-dec="${p.id}">−</button>
+                   <button data-dec="${p.id}" aria-label="Retirer un ${escapeHtml(p.name)}">−</button>
                    <span>${inCart.qty}</span>
-                   <button data-inc="${p.id}">+</button>
+                   <button data-inc="${p.id}" aria-label="Ajouter un ${escapeHtml(p.name)}">+</button>
                  </div>`
-              : `<button class="add-btn" data-add="${p.id}">+ Ajouter</button>`}
+              : `<button class="add-btn" data-add="${p.id}"><span aria-hidden="true">+</span> Ajouter</button>`}
           </div>
         </div>
-      </div>`;
+      </article>`;
   }
 
   function bindProductButtons(scope) {
@@ -251,7 +256,8 @@
 
   function renderCatTabs() {
     $('#catTabs').innerHTML = menu.map((c) =>
-      `<button class="${c.id === activeCat ? 'active' : ''}" data-cat="${c.id}">${escapeHtml(c.name)}</button>`
+      `<button class="${c.id === activeCat ? 'active' : ''}" data-cat="${c.id}" aria-pressed="${c.id === activeCat}">
+        <span>${escapeHtml(c.name)}</span><span class="ct-n">${c.products.length}</span></button>`
     ).join('');
     $$('#catTabs button').forEach((b) =>
       b.addEventListener('click', () => { activeCat = parseInt(b.dataset.cat, 10); renderCatTabs(); renderProducts(); }));
@@ -336,6 +342,7 @@
     }
     $('#drawerContent').innerHTML = cart.map((c) => `
       <div class="cart-line">
+        <img class="cl-thumb" src="${escapeHtml(productPhoto(c.product, c.product.category_name, 160))}" alt="" onerror="this.style.visibility='hidden'" />
         <div class="info">
           <strong>${escapeHtml(c.product.name)}</strong><br/>
           <span class="muted">${fmtMoney(c.product.price)}</span>
@@ -464,7 +471,7 @@
         </div>
       </div>
       <label class="check-line"><input type="checkbox" id="coRemember" checked /> Mémoriser mes informations pour mes prochaines commandes</label>
-      <div class="card" style="padding:12px;background:#f6f1ea;border:none;margin-top:14px">
+      <div class="checkout-sum">
         <div class="between flex"><span class="muted">Articles</span><span>${cartCount()}</span></div>
         <div class="cart-total" style="margin:6px 0 0"><span>Total</span><span>${fmtMoney(cartTotal())}</span></div>
       </div>

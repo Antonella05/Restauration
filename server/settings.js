@@ -13,14 +13,14 @@ const DEFAULTS = {
   name: 'Le Bon Plat',
   tagline: 'La cuisine que vous aimez, livrée avec le sourire.',
   logo_url: '',
-  primary_color: '#1769d1',
+  primary_color: '#b8431e',
 
   // Page d'accueil
   hero_eyebrow: 'Restaurant · Commande en ligne',
   hero_title: 'La cuisine que vous aimez,',
   hero_accent: 'servie à votre table ou chez vous.',
   hero_subtitle: "Une carte fraîche préparée à la commande, et le suivi de votre livraison en temps réel — de la cuisine jusqu'à votre porte.",
-  hero_image_url: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=1600&q=80',
+  hero_image_url: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1400&q=75',
 
   // Informations pratiques
   phone: '90 00 00 00',

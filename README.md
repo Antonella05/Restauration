@@ -52,6 +52,15 @@ Puis ouvrir :
 La base SQLite (`data/restaurant.db`) et les données de démonstration (menu + comptes)
 sont créées automatiquement au premier démarrage.
 
+## Photos
+
+En attendant les vraies photos du restaurant, le site affiche des **photos d'illustration
+libres de droits (Unsplash)**, choisies automatiquement selon le nom du plat ou de la
+catégorie (`public/js/common.js`, tables `DISH_PHOTOS` / `CATEGORY_PHOTOS`).
+Dès qu'une adresse `https://` est saisie dans le champ « Image » d'un produit
+(Staff → Catalogue), c'est elle qui est affichée. La photo d'accueil se change dans
+Staff → Personnalisation.
+
 ## Comptes de démonstration (staff)
 
 | Rôle | Identifiant | Mot de passe |
