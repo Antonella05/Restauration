@@ -5,6 +5,7 @@
   "main": "server/index.js",
   "type": "commonjs",
   "scripts": {
+    "build": "node scripts/build-vercel.js",
     "start": "node server/index.js",
     "seed": "node server/seed.js",
     "dev": "node server/index.js"
