@@ -2,37 +2,36 @@
 
 const express = require('express');
 const db = require('../db');
+const asyncHandler = require('../async-handler');
 const { requireRole } = require('../auth');
 
 const router = express.Router();
-
-// Gestion du catalogue: Développeur (service après installation) + Administrateur.
 const manage = requireRole('developer', 'admin');
 
-/** Liste complète (y compris produits indisponibles) pour l'administration. */
-router.get('/', manage, (req, res) => {
-  const categories = db.prepare('SELECT * FROM categories ORDER BY sort_order, name').all();
-  const products = db.prepare('SELECT * FROM products ORDER BY category_id, name').all();
+router.get('/', manage, asyncHandler(async (req, res) => {
+  const categories = await db.all('SELECT * FROM categories ORDER BY sort_order, name');
+  const products = await db.all('SELECT * FROM products ORDER BY category_id, name');
   res.json({ categories, products });
-});
+}));
 
-/** Créer une catégorie. */
-router.post('/categories', manage, (req, res) => {
+router.post('/categories', manage, asyncHandler(async (req, res) => {
   const name = (req.body.name || '').trim();
   if (!name) return res.status(400).json({ error: 'Nom de catégorie requis.' });
   const order = parseInt(req.body.sort_order, 10) || 0;
-  const info = db.prepare('INSERT INTO categories (name, sort_order) VALUES (?, ?)').run(name, order);
-  res.status(201).json({ category: db.prepare('SELECT * FROM categories WHERE id = ?').get(info.lastInsertRowid) });
-});
+  const category = await db.one(
+    'INSERT INTO categories (name, sort_order) VALUES (?, ?) RETURNING *',
+    name,
+    order
+  );
+  res.status(201).json({ category });
+}));
 
-/** Supprimer une catégorie (et ses produits). */
-router.delete('/categories/:id', manage, (req, res) => {
-  db.prepare('DELETE FROM categories WHERE id = ?').run(parseInt(req.params.id, 10));
+router.delete('/categories/:id', manage, asyncHandler(async (req, res) => {
+  await db.run('DELETE FROM categories WHERE id = ?', parseInt(req.params.id, 10));
   res.json({ ok: true });
-});
+}));
 
-/** Créer un produit. */
-router.post('/', manage, (req, res) => {
+router.post('/', manage, asyncHandler(async (req, res) => {
   const categoryId = parseInt(req.body.category_id, 10);
   const name = (req.body.name || '').trim();
   const price = Math.max(0, parseInt(req.body.price, 10) || 0);
@@ -44,21 +43,19 @@ router.post('/', manage, (req, res) => {
   if (!categoryId || !name) {
     return res.status(400).json({ error: 'Catégorie et nom requis.' });
   }
-  const cat = db.prepare('SELECT id FROM categories WHERE id = ?').get(categoryId);
-  if (!cat) return res.status(400).json({ error: 'Catégorie introuvable.' });
+  const category = await db.one('SELECT id FROM categories WHERE id = ?', categoryId);
+  if (!category) return res.status(400).json({ error: 'Catégorie introuvable.' });
 
-  const info = db.prepare(`
+  const product = await db.one(`
     INSERT INTO products (category_id, name, description, price, image_url, available, featured)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(categoryId, name, description || null, price, imageUrl || null, available, featured);
+    VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *
+  `, categoryId, name, description || null, price, imageUrl || null, available, featured);
+  res.status(201).json({ product });
+}));
 
-  res.status(201).json({ product: db.prepare('SELECT * FROM products WHERE id = ?').get(info.lastInsertRowid) });
-});
-
-/** Modifier un produit. */
-router.put('/:id', manage, (req, res) => {
+router.put('/:id', manage, asyncHandler(async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const existing = db.prepare('SELECT * FROM products WHERE id = ?').get(id);
+  const existing = await db.one('SELECT * FROM products WHERE id = ?', id);
   if (!existing) return res.status(404).json({ error: 'Produit introuvable.' });
 
   const categoryId = req.body.category_id != null ? parseInt(req.body.category_id, 10) : existing.category_id;
@@ -69,18 +66,16 @@ router.put('/:id', manage, (req, res) => {
   const available = req.body.available != null ? (req.body.available ? 1 : 0) : existing.available;
   const featured = req.body.featured != null ? (req.body.featured ? 1 : 0) : existing.featured;
 
-  db.prepare(`
+  const product = await db.one(`
     UPDATE products SET category_id = ?, name = ?, description = ?, price = ?, image_url = ?, available = ?, featured = ?
-    WHERE id = ?
-  `).run(categoryId, name, description || null, price, imageUrl || null, available, featured, id);
+    WHERE id = ? RETURNING *
+  `, categoryId, name, description || null, price, imageUrl || null, available, featured, id);
+  res.json({ product });
+}));
 
-  res.json({ product: db.prepare('SELECT * FROM products WHERE id = ?').get(id) });
-});
-
-/** Supprimer un produit. */
-router.delete('/:id', manage, (req, res) => {
-  db.prepare('DELETE FROM products WHERE id = ?').run(parseInt(req.params.id, 10));
+router.delete('/:id', manage, asyncHandler(async (req, res) => {
+  await db.run('DELETE FROM products WHERE id = ?', parseInt(req.params.id, 10));
   res.json({ ok: true });
-});
+}));
 
 module.exports = router;

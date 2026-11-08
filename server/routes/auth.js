@@ -3,11 +3,11 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const db = require('../db');
+const asyncHandler = require('../async-handler');
 const { signToken, authRequired, ROLE_LABELS } = require('../auth');
 
 const router = express.Router();
 
-/** Profil client renvoyé au navigateur : sert à pré-remplir les commandes suivantes. */
 function clientProfile(user) {
   return {
     id: user.id,
@@ -21,57 +21,40 @@ function clientProfile(user) {
   };
 }
 
-/**
- * Connexion CLIENT — version simplifiée MVP (nom + téléphone, sans mot de passe),
- * conforme au cahier des charges. Crée le compte client s'il n'existe pas.
- */
-router.post('/client-login', (req, res) => {
+router.post('/client-login', asyncHandler(async (req, res) => {
   const name = (req.body.name || '').trim();
   const phone = (req.body.phone || '').trim();
-  if (!name || !phone) {
-    return res.status(400).json({ error: 'Nom et téléphone requis.' });
-  }
+  if (!name || !phone) return res.status(400).json({ error: 'Nom et téléphone requis.' });
 
-  let user = db.prepare(
-    "SELECT * FROM users WHERE role = 'client' AND phone = ?"
-  ).get(phone);
-
+  let user = await db.one("SELECT * FROM users WHERE role = 'client' AND phone = ?", phone);
   if (!user) {
-    const info = db.prepare(
-      "INSERT INTO users (role, name, phone) VALUES ('client', ?, ?)"
-    ).run(name, phone);
-    user = db.prepare('SELECT * FROM users WHERE id = ?').get(info.lastInsertRowid);
+    user = await db.one(
+      "INSERT INTO users (role, name, phone) VALUES ('client', ?, ?) RETURNING *",
+      name,
+      phone
+    );
   } else if (user.name !== name) {
-    db.prepare('UPDATE users SET name = ? WHERE id = ?').run(name, user.id);
+    await db.run('UPDATE users SET name = ? WHERE id = ?', name, user.id);
     user.name = name;
   }
 
-  const token = signToken(user);
-  res.json({
-    token,
-    user: clientProfile(user),
-  });
-});
+  res.json({ token: signToken(user), user: clientProfile(user) });
+}));
 
-/**
- * Connexion STAFF — login + mot de passe.
- * Rôles: callcenter, manager, admin, developer.
- */
-router.post('/login', (req, res) => {
+router.post('/login', asyncHandler(async (req, res) => {
   const username = (req.body.username || '').trim().toLowerCase();
   const password = req.body.password || '';
   if (!username || !password) {
     return res.status(400).json({ error: 'Identifiant et mot de passe requis.' });
   }
 
-  const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+  const user = await db.one('SELECT * FROM users WHERE username = ?', username);
   if (!user || !user.password_hash || !bcrypt.compareSync(password, user.password_hash)) {
     return res.status(401).json({ error: 'Identifiants incorrects.' });
   }
 
-  const token = signToken(user);
   res.json({
-    token,
+    token: signToken(user),
     user: {
       id: user.id,
       role: user.role,
@@ -79,12 +62,11 @@ router.post('/login', (req, res) => {
       roleLabel: ROLE_LABELS[user.role] || user.role,
     },
   });
-});
+}));
 
-/** Renvoie l'utilisateur courant à partir du token. */
-router.get('/me', authRequired, (req, res) => {
+router.get('/me', authRequired, asyncHandler(async (req, res) => {
   if (req.user.role === 'client') {
-    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+    const user = await db.one('SELECT * FROM users WHERE id = ?', req.user.id);
     if (!user) return res.status(401).json({ error: 'Compte introuvable.' });
     return res.json({ user: clientProfile(user) });
   }
@@ -96,6 +78,6 @@ router.get('/me', authRequired, (req, res) => {
       roleLabel: ROLE_LABELS[req.user.role] || req.user.role,
     },
   });
-});
+}));
 
 module.exports = router;

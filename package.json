@@ -6,17 +6,22 @@
   "type": "commonjs",
   "scripts": {
     "build": "node scripts/build-vercel.js",
+    "test": "node --test",
     "start": "node server/index.js",
     "seed": "node server/seed.js",
     "dev": "node server/index.js"
   },
   "license": "MIT",
   "dependencies": {
+    "@neondatabase/serverless": "^1.2.0",
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^11.3.0",
     "cookie-parser": "^1.4.6",
-    "express": "^4.19.2",
+    "express": "^4.22.3",
     "jsonwebtoken": "^9.0.2",
-    "ws": "^8.18.0"
+    "ws": "^8.22.1"
+  },
+  "overrides": {
+    "qs": "^6.16.1"
   }
 }

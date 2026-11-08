@@ -1,4 +1,4 @@
-/* Helpers partagés: stockage auth, appels API, WebSocket temps réel, toasts. */
+/* Helpers partagés: stockage auth, appels API, synchronisation des événements, toasts. */
 (function () {
   const TOKEN_KEY = 'resto_token';
   const USER_KEY = 'resto_user';
@@ -48,27 +48,52 @@
     setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 3500);
   }
 
-  /* --- WebSocket temps réel avec reconnexion --- */
+  /* --- Synchronisation des événements compatible avec les fonctions serverless --- */
   function connectRealtime(onEvent, onStatus) {
-    let ws = null, retry = 0, closed = false;
-    function open() {
-      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-      const url = `${proto}://${location.host}/ws${Auth.token ? '?token=' + encodeURIComponent(Auth.token) : ''}`;
-      ws = new WebSocket(url);
-      ws.onopen = () => { retry = 0; onStatus && onStatus(true); };
-      ws.onmessage = (ev) => {
-        try { onEvent(JSON.parse(ev.data)); } catch (e) {}
-      };
-      ws.onclose = () => {
-        onStatus && onStatus(false);
-        if (closed) return;
-        retry = Math.min(retry + 1, 6);
-        setTimeout(open, 500 * retry);
-      };
-      ws.onerror = () => { try { ws.close(); } catch (e) {} };
+    let timer = null;
+    let lastEventId = null;
+    let retry = 0;
+    let closed = false;
+    let connected = false;
+
+    function setConnected(value) {
+      if (connected === value) return;
+      connected = value;
+      if (onStatus) onStatus(value);
     }
-    open();
-    return { close() { closed = true; try { ws.close(); } catch (e) {} } };
+
+    async function poll() {
+      if (closed) return;
+      try {
+        const query = lastEventId === null ? '' : '?after=' + encodeURIComponent(lastEventId);
+        const data = await api('/events' + query);
+        if (lastEventId === null) {
+          lastEventId = data.cursor;
+        } else {
+          for (const entry of data.events) {
+            onEvent(entry.event);
+            lastEventId = entry.id;
+          }
+          lastEventId = Math.max(lastEventId, data.cursor);
+        }
+        retry = 0;
+        setConnected(true);
+        timer = setTimeout(poll, 2500);
+      } catch (error) {
+        setConnected(false);
+        retry = Math.min(retry + 1, 6);
+        timer = setTimeout(poll, Math.min(30000, 1000 * (2 ** retry)));
+      }
+    }
+
+    poll();
+    return {
+      close() {
+        closed = true;
+        if (timer) clearTimeout(timer);
+        setConnected(false);
+      },
+    };
   }
 
   const STATUS_LABELS = {

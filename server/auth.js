@@ -3,6 +3,10 @@
 const jwt = require('jsonwebtoken');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'resto-mvp-dev-secret-change-me';
+const isProduction = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
+if (isProduction && (!process.env.JWT_SECRET || JWT_SECRET.length < 32)) {
+  throw new Error('En production, JWT_SECRET doit être défini avec au moins 32 caractères.');
+}
 const TOKEN_TTL = '7d';
 
 const ROLES = ['client', 'callcenter', 'manager', 'admin', 'developer'];

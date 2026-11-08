@@ -4,10 +4,9 @@ Application **web** de gestion des commandes et livraisons pour un restaurant.
 Ce dépôt correspond au **MVP (Phase 1)** du cahier des charges, en **version web
 uniquement**, avec **tous les acteurs** connectables et une **interface dédiée par rôle**.
 
-> Le cahier des charges recommande à terme Flutter + Firebase (mobile). Pour livrer un
-> MVP web démontrable immédiatement — sans dépendance à un projet cloud externe — la
-> stack retenue est **Node.js + Express + SQLite + WebSocket**. L'architecture reste
-> migrable vers Firebase/cloud en Phase 2 (le temps réel et l'auth sont déjà isolés).
+> Stack : **HTML/CSS/JavaScript**, **Node.js + Express**, et **SQLite en local** ou
+> **Neon PostgreSQL sur Vercel**. Le suivi des commandes utilise une synchronisation
+> périodique compatible avec les serveurs locaux et les fonctions serverless.
 
 ## Acteurs & interfaces
 
@@ -28,7 +27,7 @@ livraison », **sans** transaction automatisée, comme prévu pour le MVP).
 
 Côté back-office : liste des commandes, mise à jour du statut.
 
-Côté call center : notification de nouvelle commande (push temps réel via WebSocket),
+Côté call center : notification périodique de nouvelle commande,
 consultation et validation (Accepter / Annuler), suivi temps réel partagé entre tous les rôles.
 
 Côté développeur : mise à jour du catalogue produits.
@@ -49,8 +48,42 @@ Puis ouvrir :
 - **Espace client** : http://localhost:3000/
 - **Espace staff** : http://localhost:3000/staff.html
 
-La base SQLite (`data/restaurant.db`) et les données de démonstration (menu + comptes)
-sont créées automatiquement au premier démarrage.
+En local, la base SQLite (`data/restaurant.db`) et le menu et comptes de démonstration
+sont créés automatiquement au premier appel à l'API.
+
+## Déploiement Vercel
+
+Le dépôt contient `vercel.json`, un build statique et une fonction Express pour l'API.
+Sur Vercel, les données sont stockées dans Neon PostgreSQL ; elles ne sont pas écrites
+dans le système de fichiers temporaire de la fonction.
+La connexion Neon est ouverte pour chaque requête API puis fermée avec sa réponse,
+conformément au fonctionnement des connexions WebSocket en environnement serverless.
+
+1. Crée un projet PostgreSQL sur [Neon](https://neon.tech/) et copie l'URL de connexion
+   **pooled** depuis son tableau de bord.
+2. Dans Vercel, ouvre le projet **Restauration → Settings → Build and Deployment** :
+   - **Root Directory** : laisse la racine du dépôt (`./`, valeur par défaut).
+   - **Framework Preset** : `Other`.
+   - **Build Command** : `npm run build`.
+   - **Output Directory** : `dist`.
+3. Dans **Settings → Environment Variables**, ajoute les variables suivantes pour
+   **Production** (et Preview si tu souhaites utiliser les prévisualisations) :
+   - `DATABASE_URL` : URL pooled Neon.
+   - `JWT_SECRET` : secret aléatoire d'au moins 32 caractères.
+   - `INITIAL_ADMIN_USERNAME` : identifiant de l'administrateur initial.
+   - `INITIAL_ADMIN_PASSWORD` : mot de passe initial d'au moins 12 caractères.
+4. Enregistre les variables, puis ouvre **Deployments** et relance un déploiement
+   depuis la branche reliée au dépôt. Le schéma PostgreSQL, le menu de démonstration et
+   l'administrateur sont initialisés au premier appel API. Vérifie le résultat sur
+   `/api/health`.
+5. Après la première connexion réussie à l'espace staff, retire
+   `INITIAL_ADMIN_PASSWORD` des variables Vercel si tu n'en as plus besoin ; le compte
+   déjà créé reste dans la base.
+
+Les comptes staff de démonstration (`admin/admin123`, etc.) ne sont créés qu'en local.
+Ne partage pas les valeurs de ces variables et ne les ajoute pas au dépôt. La base Neon
+commence vide : les commandes, comptes et personnalisations déjà présents dans un
+fichier SQLite local ne sont pas transférés automatiquement.
 
 ## Photos
 
@@ -76,12 +109,13 @@ Le **client** se connecte simplement avec un nom et un numéro de téléphone.
 
 ```
 server/
-  index.js          Serveur Express + service statique + init WebSocket
-  db.js             Connexion SQLite + schéma (+ migrations douces des bases existantes)
+  index.js          Application Express locale et API serverless
+  db.js             Adaptateur SQLite local / Neon PostgreSQL
+  schema.postgres.sql Schéma créé automatiquement dans Neon
   settings.js       Paramètres du restaurant (identité, accueil, règles de retrait)
   seed.js           Données de démonstration (comptes staff + menu) — idempotent
   auth.js           JWT, rôles et middlewares d'autorisation
-  realtime.js       Hub WebSocket (diffusion des événements de commande)
+  realtime.js       File d'événements persistée pour le polling
   routes/
     auth.js         Connexion client (nom+tél) et staff (login+mdp)
     menu.js         Menu public (catégories + produits disponibles)
@@ -91,7 +125,7 @@ server/
 public/
   index.html        Application client
   staff.html        Application staff (login + tableaux de bord par rôle)
-  js/common.js      Auth (localStorage), appels API, WebSocket, toasts
+  js/common.js      Auth (localStorage), appels API, polling, toasts
   js/client.js      Logique de l'interface client
   js/staff.js       Logique des interfaces staff
   css/styles.css    Styles
@@ -116,13 +150,16 @@ public/
 - Le **total** d'une commande est recalculé côté serveur à partir des prix en base
   (jamais fait confiance au montant envoyé par le client).
 
-## Variables d'environnement (optionnel)
+## Variables d'environnement
 
 | Variable | Défaut | Rôle |
 |---|---|---|
 | `PORT` | `3000` | Port d'écoute |
-| `JWT_SECRET` | valeur de dev | Secret de signature des tokens (à définir en production) |
-| `DB_PATH` | `data/restaurant.db` | Emplacement de la base SQLite |
+| `JWT_SECRET` | valeur de développement locale | Secret JWT ; obligatoire en production (32 caractères minimum) |
+| `DB_PATH` | `data/restaurant.db` | Emplacement SQLite en local si `DATABASE_URL` n'est pas défini |
+| `DATABASE_URL` | aucune en local | URL pooled Neon ; obligatoire sur Vercel et en production |
+| `INITIAL_ADMIN_USERNAME` | aucun en production | Identifiant du compte administrateur initial |
+| `INITIAL_ADMIN_PASSWORD` | aucun en production | Mot de passe initial (12 caractères minimum) |
 
 ## Évolutions suite à la démonstration du 3 septembre 2026
 

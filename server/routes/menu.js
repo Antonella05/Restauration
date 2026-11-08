@@ -2,25 +2,18 @@
 
 const express = require('express');
 const db = require('../db');
+const asyncHandler = require('../async-handler');
 
 const router = express.Router();
 
-/** Menu public: catégories + produits disponibles, chargés depuis la base. */
-router.get('/', (req, res) => {
-  const categories = db.prepare(
-    'SELECT * FROM categories ORDER BY sort_order, name'
-  ).all();
-
-  const products = db.prepare(
-    'SELECT * FROM products WHERE available = 1 ORDER BY name'
-  ).all();
-
-  const byCat = categories.map((c) => ({
-    ...c,
-    products: products.filter((p) => p.category_id === c.id),
+router.get('/', asyncHandler(async (req, res) => {
+  const categories = await db.all('SELECT * FROM categories ORDER BY sort_order, name');
+  const products = await db.all('SELECT * FROM products WHERE available = 1 ORDER BY name');
+  const byCategory = categories.map((category) => ({
+    ...category,
+    products: products.filter((product) => product.category_id === category.id),
   }));
-
-  res.json({ categories: byCat });
-});
+  res.json({ categories: byCategory });
+}));
 
 module.exports = router;

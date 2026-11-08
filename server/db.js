@@ -1,130 +1,242 @@
 'use strict';
 
-const path = require('path');
 const fs = require('fs');
-const Database = require('better-sqlite3');
+const path = require('path');
+const { AsyncLocalStorage } = require('node:async_hooks');
 
-const DATA_DIR = path.join(__dirname, '..', 'data');
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+const usePostgres = Boolean(process.env.DATABASE_URL);
+const isProduction = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
+if (isProduction && !usePostgres) {
+  throw new Error('DATABASE_URL doit être configurée dans les variables du projet Vercel.');
+}
 
-const DB_PATH = process.env.DB_PATH || path.join(DATA_DIR, 'restaurant.db');
-const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+let sqlite = null;
+let PgPool = null;
+let initialization;
+let localTransactionGate = null;
+let transactionQueue = Promise.resolve();
+const requestContext = new AsyncLocalStorage();
 
-/**
- * Schéma de la base.
- * Rôles: 'client', 'callcenter', 'manager', 'admin', 'developer'
- * Statuts commande: 'pending', 'accepted', 'preparing',
- *   livraison : 'delivering' → 'delivered'
- *   retrait   : 'ready' → 'picked_up' (ou 'no_show' si non récupérée)
- *   'cancelled'
- */
-db.exec(`
-CREATE TABLE IF NOT EXISTS users (
-  id            INTEGER PRIMARY KEY AUTOINCREMENT,
-  role          TEXT NOT NULL,
-  name          TEXT NOT NULL,
-  phone         TEXT,
-  username      TEXT UNIQUE,
-  password_hash TEXT,
-  created_at    TEXT NOT NULL DEFAULT (datetime('now'))
-);
+if (usePostgres) {
+  const { Pool, neonConfig } = require('@neondatabase/serverless');
+  const { WebSocket } = require('ws');
+  neonConfig.webSocketConstructor = WebSocket;
+  PgPool = Pool;
+} else {
+  const Database = require('better-sqlite3');
+  const dataDir = path.join(__dirname, '..', 'data');
+  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
-CREATE TABLE IF NOT EXISTS categories (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  name       TEXT NOT NULL,
-  sort_order INTEGER NOT NULL DEFAULT 0
-);
+  sqlite = new Database(process.env.DB_PATH || path.join(dataDir, 'restaurant.db'));
+  sqlite.pragma('journal_mode = WAL');
+  sqlite.pragma('foreign_keys = ON');
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, role TEXT NOT NULL, name TEXT NOT NULL,
+      phone TEXT, username TEXT UNIQUE, password_hash TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS products (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+      name TEXT NOT NULL, description TEXT, price INTEGER NOT NULL DEFAULT 0, image_url TEXT,
+      available INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      featured INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id INTEGER REFERENCES users(id),
+      customer_name TEXT NOT NULL, customer_phone TEXT NOT NULL, comment TEXT,
+      payment_method TEXT NOT NULL DEFAULT 'cash', status TEXT NOT NULL DEFAULT 'pending',
+      cancel_reason TEXT, total INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      fulfillment TEXT NOT NULL DEFAULT 'delivery', delivery_address TEXT, latitude REAL, longitude REAL,
+      location_accuracy REAL, pickup_time TEXT, ready_at TEXT, completed_at TEXT, modified_at TEXT,
+      client_ack INTEGER NOT NULL DEFAULT 1
+    );
+    CREATE TABLE IF NOT EXISTS order_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      product_id INTEGER REFERENCES products(id), product_name TEXT NOT NULL,
+      unit_price INTEGER NOT NULL, quantity INTEGER NOT NULL DEFAULT 1
+    );
+    CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
+    CREATE TABLE IF NOT EXISTS order_modifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      user_id INTEGER REFERENCES users(id), user_name TEXT, summary TEXT NOT NULL, note TEXT,
+      old_total INTEGER NOT NULL, new_total INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS realtime_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id INTEGER, payload TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id);
+    CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+    CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
+    CREATE INDEX IF NOT EXISTS idx_order_mods_order ON order_modifications(order_id);
+    CREATE INDEX IF NOT EXISTS idx_orders_completed ON orders(completed_at);
+    CREATE INDEX IF NOT EXISTS idx_realtime_events_customer ON realtime_events(customer_id, id);
+  `);
 
-CREATE TABLE IF NOT EXISTS products (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
-  name        TEXT NOT NULL,
-  description TEXT,
-  price       INTEGER NOT NULL DEFAULT 0,       -- prix en FCFA (entier)
-  image_url   TEXT,
-  available   INTEGER NOT NULL DEFAULT 1,
-  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-);
+  function addColumn(table, column, definition) {
+    const columns = sqlite.prepare(`PRAGMA table_info(${table})`).all();
+    if (!columns.some((entry) => entry.name === column)) {
+      sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    }
+  }
 
-CREATE TABLE IF NOT EXISTS orders (
-  id             INTEGER PRIMARY KEY AUTOINCREMENT,
-  customer_id    INTEGER REFERENCES users(id),
-  customer_name  TEXT NOT NULL,
-  customer_phone TEXT NOT NULL,
-  comment        TEXT,
-  payment_method TEXT NOT NULL DEFAULT 'cash',   -- 'cash' | 'mobile_money'
-  status         TEXT NOT NULL DEFAULT 'pending',
-  cancel_reason  TEXT,
-  total          INTEGER NOT NULL DEFAULT 0,
-  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
-);
+  addColumn('users', 'address', 'TEXT');
+  addColumn('users', 'latitude', 'REAL');
+  addColumn('users', 'longitude', 'REAL');
+  addColumn('users', 'fulfillment', 'TEXT');
+  addColumn('products', 'featured', 'INTEGER NOT NULL DEFAULT 0');
+  addColumn('orders', 'fulfillment', "TEXT NOT NULL DEFAULT 'delivery'");
+  addColumn('orders', 'delivery_address', 'TEXT');
+  addColumn('orders', 'latitude', 'REAL');
+  addColumn('orders', 'longitude', 'REAL');
+  addColumn('orders', 'location_accuracy', 'REAL');
+  addColumn('orders', 'pickup_time', 'TEXT');
+  addColumn('orders', 'ready_at', 'TEXT');
+  addColumn('orders', 'completed_at', 'TEXT');
+  addColumn('orders', 'modified_at', 'TEXT');
+  addColumn('orders', 'client_ack', 'INTEGER NOT NULL DEFAULT 1');
+}
 
-CREATE TABLE IF NOT EXISTS order_items (
-  id           INTEGER PRIMARY KEY AUTOINCREMENT,
-  order_id     INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-  product_id   INTEGER REFERENCES products(id),
-  product_name TEXT NOT NULL,
-  unit_price   INTEGER NOT NULL,
-  quantity     INTEGER NOT NULL DEFAULT 1
-);
+function currentPool() {
+  const context = requestContext.getStore();
+  if (!context) throw new Error('Connexion PostgreSQL indisponible hors du contexte de requête.');
+  return context.pool;
+}
 
--- Paramètres du restaurant (identité visuelle, informations, règles) : clé / valeur.
-CREATE TABLE IF NOT EXISTS settings (
-  key   TEXT PRIMARY KEY,
-  value TEXT
-);
+async function withRequest(callback) {
+  if (!usePostgres || requestContext.getStore()) return callback();
 
--- Historique des modifications d'une commande par le centre d'appels.
-CREATE TABLE IF NOT EXISTS order_modifications (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  order_id    INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-  user_id     INTEGER REFERENCES users(id),
-  user_name   TEXT,
-  summary     TEXT NOT NULL,                     -- description lisible des changements
-  note        TEXT,                              -- motif / commentaire de l'agent
-  old_total   INTEGER NOT NULL,
-  new_total   INTEGER NOT NULL,
-  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-);
+  const pool = new PgPool({ connectionString: process.env.DATABASE_URL, max: 1 });
+  pool.on('error', (error) => console.error('Erreur de connexion Neon :', error));
+  return requestContext.run({ pool }, async () => {
+    try {
+      return await callback();
+    } finally {
+      await pool.end();
+    }
+  });
+}
 
-CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id);
-CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
-CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
-CREATE INDEX IF NOT EXISTS idx_order_mods_order ON order_modifications(order_id);
-`);
+function postgresSql(statement) {
+  let index = 0;
+  return statement.replace(/\?/g, () => `$${++index}`);
+}
 
-/** Migration douce : ajoute une colonne si elle n'existe pas encore (bases déjà créées). */
-function addColumn(table, column, definition) {
-  const cols = db.prepare(`PRAGMA table_info(${table})`).all();
-  if (!cols.some((c) => c.name === column)) {
-    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+function sqliteQuery(statement, params) {
+  const result = sqlite.prepare(statement);
+  if (/^\s*(SELECT|PRAGMA|WITH)\b/i.test(statement)) {
+    const rows = result.all(...params);
+    return { rows, rowCount: rows.length };
+  }
+  if (/\bRETURNING\b/i.test(statement)) {
+    const rows = result.all(...params);
+    return { rows, rowCount: rows.length };
+  }
+  const info = result.run(...params);
+  return { rows: [], rowCount: info.changes, lastInsertRowid: info.lastInsertRowid };
+}
+
+function executor(queryFn) {
+  return {
+    query: queryFn,
+    async all(statement, ...params) {
+      return (await queryFn(statement, params)).rows;
+    },
+    async one(statement, ...params) {
+      return (await queryFn(statement, params)).rows[0] || null;
+    },
+    async run(statement, ...params) {
+      return queryFn(statement, params);
+    },
+  };
+}
+
+const rootExecutor = executor(async (statement, params = []) => {
+  if (usePostgres) return currentPool().query(postgresSql(statement), params);
+  if (localTransactionGate) await localTransactionGate;
+  return sqliteQuery(statement, params);
+});
+
+async function transaction(callback) {
+  if (usePostgres) {
+    const client = await currentPool().connect();
+    try {
+      await client.query('BEGIN');
+      const tx = executor((statement, params = []) => client.query(postgresSql(statement), params));
+      const result = await callback(tx);
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  let releaseQueue;
+  const previous = transactionQueue;
+  transactionQueue = new Promise((resolve) => { releaseQueue = resolve; });
+  await previous;
+  let releaseGate;
+  localTransactionGate = new Promise((resolve) => { releaseGate = resolve; });
+  const tx = executor(async (statement, params = []) => sqliteQuery(statement, params));
+  try {
+    sqlite.exec('BEGIN IMMEDIATE');
+    const result = await callback(tx);
+    sqlite.exec('COMMIT');
+    return result;
+  } catch (error) {
+    sqlite.exec('ROLLBACK');
+    throw error;
+  } finally {
+    localTransactionGate = null;
+    releaseGate();
+    releaseQueue();
   }
 }
 
-// Informations mémorisées du client (commandes récurrentes).
-addColumn('users', 'address', 'TEXT');
-addColumn('users', 'latitude', 'REAL');
-addColumn('users', 'longitude', 'REAL');
-addColumn('users', 'fulfillment', 'TEXT');           // dernier mode de réception choisi
+async function initialize() {
+  if (!initialization) {
+    initialization = (async () => {
+      if (usePostgres) {
+        await transaction(async (tx) => {
+          await tx.query('SELECT pg_advisory_xact_lock(729418260)');
+          const schema = fs.readFileSync(path.join(__dirname, 'schema.postgres.sql'), 'utf8');
+          for (const statement of schema.split(';').map((part) => part.trim()).filter(Boolean)) {
+            await tx.query(statement);
+          }
+          await require('./seed').ensureSeed(tx);
+        });
+      } else {
+        await transaction((tx) => require('./seed').ensureSeed(tx));
+      }
+    })().catch((error) => {
+      initialization = null;
+      throw error;
+    });
+  }
+  return initialization;
+}
 
-// Mise en avant sur la page d'accueil.
-addColumn('products', 'featured', 'INTEGER NOT NULL DEFAULT 0');
+async function close() {
+  if (sqlite && sqlite.open) sqlite.close();
+}
 
-// Mode de réception : 'delivery' (livraison) | 'pickup' (retrait sur place).
-addColumn('orders', 'fulfillment', "TEXT NOT NULL DEFAULT 'delivery'");
-addColumn('orders', 'delivery_address', 'TEXT');
-addColumn('orders', 'latitude', 'REAL');
-addColumn('orders', 'longitude', 'REAL');
-addColumn('orders', 'location_accuracy', 'REAL');
-addColumn('orders', 'pickup_time', 'TEXT');          // heure de retrait souhaitée (UTC), NULL = dès que possible
-addColumn('orders', 'ready_at', 'TEXT');             // commande prête à retirer
-addColumn('orders', 'completed_at', 'TEXT');         // livrée ou retirée (statistiques du jour)
-addColumn('orders', 'modified_at', 'TEXT');          // dernière modification par le centre d'appels
-addColumn('orders', 'client_ack', 'INTEGER NOT NULL DEFAULT 1'); // 0 = modification non encore lue par le client
-
-db.exec('CREATE INDEX IF NOT EXISTS idx_orders_completed ON orders(completed_at)');
-
-module.exports = db;
+module.exports = {
+  ...rootExecutor,
+  withRequest,
+  initialize,
+  transaction,
+  close,
+  isPostgres: usePostgres,
+};

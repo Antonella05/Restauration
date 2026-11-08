@@ -112,58 +112,93 @@ const PRODUCT_IMAGE = {
   'Jus de bissap':      U('1595981267035-7b04ca84a82d'),
 };
 
-const insCatStmt = () => db.prepare('INSERT INTO categories (name, sort_order) VALUES (?, ?)');
-const insProdStmt = () => db.prepare(
-  'INSERT INTO products (category_id, name, description, price, image_url, available) VALUES (?, ?, ?, ?, ?, 1)'
-);
-
-function ensureSeed() {
-  // Staff
-  const insStaff = db.prepare(
-    'INSERT INTO users (role, name, username, password_hash) VALUES (?, ?, ?, ?)'
+async function insertCategory(executor, name, sortOrder) {
+  const row = await executor.one(
+    'INSERT INTO categories (name, sort_order) VALUES (?, ?) RETURNING id',
+    name,
+    sortOrder
   );
-  for (const s of STAFF) {
-    const exists = db.prepare('SELECT id FROM users WHERE username = ?').get(s.username);
-    if (!exists) {
-      insStaff.run(s.role, s.name, s.username, bcrypt.hashSync(s.password, 10));
+  return row.id;
+}
+
+async function insertProducts(executor, categoryId, products, imageForCategory) {
+  for (const product of products) {
+    await executor.run(
+      'INSERT INTO products (category_id, name, description, price, image_url, available) VALUES (?, ?, ?, ?, ?, 1)',
+      categoryId,
+      product.name,
+      product.description,
+      product.price,
+      PRODUCT_IMAGE[product.name] || imageForCategory
+    );
+  }
+}
+
+async function ensureSeed(executor = db) {
+  const production = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
+  const staff = production ? [] : STAFF;
+
+  for (const user of staff) {
+    await executor.run(
+      'INSERT INTO users (role, name, username, password_hash) VALUES (?, ?, ?, ?) ON CONFLICT(username) DO NOTHING',
+      user.role,
+      user.name,
+      user.username,
+      bcrypt.hashSync(user.password, 10)
+    );
+  }
+
+  const initialAdminUsername = process.env.INITIAL_ADMIN_USERNAME;
+  const initialAdminPassword = process.env.INITIAL_ADMIN_PASSWORD;
+  if (production && Boolean(initialAdminUsername) !== Boolean(initialAdminPassword)) {
+    throw new Error('INITIAL_ADMIN_USERNAME et INITIAL_ADMIN_PASSWORD doivent être définis ensemble.');
+  }
+  if (production && initialAdminUsername && initialAdminPassword) {
+    if (!initialAdminUsername.trim() || initialAdminPassword.length < 12) {
+      throw new Error('L’identifiant administrateur ne peut pas être vide et le mot de passe doit faire au moins 12 caractères.');
     }
+    await executor.run(
+      'INSERT INTO users (role, name, username, password_hash) VALUES (?, ?, ?, ?) ON CONFLICT(username) DO NOTHING',
+      'admin',
+      'Administrateur',
+      initialAdminUsername.trim().toLowerCase(),
+      bcrypt.hashSync(initialAdminPassword, 10)
+    );
   }
 
-  // Menu
-  const catCount = db.prepare('SELECT COUNT(*) AS c FROM categories').get().c;
-  if (catCount === 0) {
-    const insCat = insCatStmt();
-    const insProd = insProdStmt();
-    MENU.forEach((cat, idx) => {
-      const info = insCat.run(cat.category, idx);
-      const image = CAT_IMAGE[cat.category] || null;
-      for (const p of cat.products) {
-        insProd.run(info.lastInsertRowid, p.name, p.description, p.price, PRODUCT_IMAGE[p.name] || image);
-      }
-    });
-    db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('seed_drinks', '1')").run();
+  const catCount = await executor.one('SELECT COUNT(*) AS c FROM categories');
+  if (Number(catCount.c) === 0) {
+    for (const [index, category] of MENU.entries()) {
+      const categoryId = await insertCategory(executor, category.category, index);
+      await insertProducts(executor, categoryId, category.products, CAT_IMAGE[category.category] || null);
+    }
+    await executor.run(
+      "INSERT INTO settings (key, value) VALUES ('seed_drinks', '1') ON CONFLICT(key) DO NOTHING"
+    );
   }
 
-  // Bases créées avant l'ajout des boissons : on les ajoute une seule fois
-  // (un drapeau évite de les recréer si le restaurant les supprime ensuite).
-  const drinksSeeded = db.prepare("SELECT value FROM settings WHERE key = 'seed_drinks'").get();
+  const drinksSeeded = await executor.one("SELECT value FROM settings WHERE key = 'seed_drinks'");
   if (!drinksSeeded) {
-    const hasCat = db.prepare('SELECT id FROM categories WHERE name = ?').get(DRINKS.category);
-    if (!hasCat) {
-      const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order), 0) AS m FROM categories').get().m;
-      const info = insCatStmt().run(DRINKS.category, maxOrder + 1);
-      const insProd = insProdStmt();
-      for (const p of DRINKS.products) {
-        insProd.run(info.lastInsertRowid, p.name, p.description, p.price, PRODUCT_IMAGE[p.name] || CAT_IMAGE[DRINKS.category]);
-      }
+    let category = await executor.one('SELECT id FROM categories WHERE name = ?', DRINKS.category);
+    if (!category) {
+      const maxOrder = await executor.one('SELECT COALESCE(MAX(sort_order), 0) AS m FROM categories');
+      const categoryId = await insertCategory(executor, DRINKS.category, Number(maxOrder.m) + 1);
+      category = { id: categoryId };
+      await insertProducts(executor, category.id, DRINKS.products, CAT_IMAGE[DRINKS.category]);
     }
-    db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('seed_drinks', '1')").run();
+    await executor.run(
+      "INSERT INTO settings (key, value) VALUES ('seed_drinks', '1') ON CONFLICT(key) DO NOTHING"
+    );
   }
 }
 
 if (require.main === module) {
-  ensureSeed();
-  console.log('Seed terminé.');
+  db.initialize()
+    .then(() => console.log('Seed terminé.'))
+    .catch((error) => {
+      console.error('Échec du seed :', error);
+      process.exitCode = 1;
+    });
 }
 
 module.exports = { ensureSeed };

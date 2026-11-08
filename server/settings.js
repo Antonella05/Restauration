@@ -38,6 +38,12 @@ const DEFAULTS = {
 const MAX_LEN = 600;
 const MAX_IMAGE_LEN = 700000; // logo importé en data URL (~500 Ko)
 
+function validationError(message) {
+  const error = new Error(message);
+  error.status = 400;
+  return error;
+}
+
 /** Une URL d'image acceptable : http(s) ou image encodée (data:image/...). */
 function isImageUrl(v) {
   return /^https?:\/\//i.test(v) || /^data:image\/(png|jpe?g|gif|webp|svg\+xml);base64,/i.test(v);
@@ -46,12 +52,14 @@ function isImageUrl(v) {
 function validate(key, raw) {
   const v = String(raw == null ? '' : raw).trim();
   if (key === 'logo_url' || key === 'hero_image_url') {
-    if (v && !isImageUrl(v)) throw new Error('Image invalide : utilisez une adresse http(s) ou importez un fichier image.');
-    if (v.length > MAX_IMAGE_LEN) throw new Error('Image trop lourde (500 Ko maximum).');
+    if (v && !isImageUrl(v)) {
+      throw validationError('Image invalide : utilisez une adresse http(s) ou importez un fichier image.');
+    }
+    if (v.length > MAX_IMAGE_LEN) throw validationError('Image trop lourde (500 Ko maximum).');
     return v;
   }
   if (key === 'primary_color') {
-    if (!/^#[0-9a-f]{6}$/i.test(v)) throw new Error('Couleur invalide (format #RRGGBB).');
+    if (!/^#[0-9a-f]{6}$/i.test(v)) throw validationError('Couleur invalide (format #RRGGBB).');
     return v.toLowerCase();
   }
   if (key === 'delivery_enabled' || key === 'pickup_enabled') {
@@ -61,32 +69,35 @@ function validate(key, raw) {
     const n = parseInt(v, 10);
     return String(Number.isFinite(n) && n >= 0 ? Math.min(n, 24 * 60) : 60);
   }
-  if (key === 'name' && !v) throw new Error('Le nom du restaurant est requis.');
+  if (key === 'name' && !v) throw validationError('Le nom du restaurant est requis.');
   return v.slice(0, MAX_LEN);
 }
 
-function getSettings() {
-  const rows = db.prepare('SELECT key, value FROM settings').all();
+async function getSettings(executor = db) {
+  const rows = await executor.all('SELECT key, value FROM settings');
   const out = { ...DEFAULTS };
   for (const r of rows) if (r.key in DEFAULTS && r.value != null) out[r.key] = r.value;
   return out;
 }
 
-function updateSettings(patch) {
+async function updateSettings(patch, executor = db) {
   const clean = {};
   for (const key of Object.keys(patch || {})) {
     if (!(key in DEFAULTS)) continue;
     clean[key] = validate(key, patch[key]);
   }
-  const merged = { ...getSettings(), ...clean };
+  const merged = { ...(await getSettings(executor)), ...clean };
   if (merged.delivery_enabled !== '1' && merged.pickup_enabled !== '1') {
-    throw new Error('Au moins un mode de réception (livraison ou retrait) doit rester actif.');
+    throw validationError('Au moins un mode de réception (livraison ou retrait) doit rester actif.');
   }
-  const upsert = db.prepare(
-    'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
-  );
-  db.transaction(() => { for (const [k, v] of Object.entries(clean)) upsert.run(k, v); })();
-  return getSettings();
+  for (const [key, value] of Object.entries(clean)) {
+    await executor.run(
+      'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+      key,
+      value
+    );
+  }
+  return getSettings(executor);
 }
 
 module.exports = { DEFAULTS, getSettings, updateSettings };
